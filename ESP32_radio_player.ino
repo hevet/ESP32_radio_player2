@@ -1,6 +1,5 @@
-
 #include "Arduino.h"              // Standardowy nagłówek Arduino, który dostarcza podstawowe funkcje i definicje
-#include "WiFiMulti.h"            // Biblioteka do obsługi wielu połączeń WiFi
+//#include "WiFiMulti.h"            // Biblioteka do obsługi wielu połączeń WiFi
 #include "Audio.h"                // Biblioteka do obsługi funkcji związanych z dźwiękiem i audio
 #include "SPI.h"                  // Biblioteka do obsługi komunikacji SPI
 #include "SD.h"                   // Biblioteka do obsługi kart SD
@@ -10,6 +9,7 @@
 #include <HTTPClient.h>           // Biblioteka do wykonywania żądań HTTP
 #include <EEPROM.h>               // Biblioteka do obsługi pamięci EEPROM
 #include <Ticker.h>               // Mechanizm tickera (do odświeżania)
+#include <WiFiManager.h>          // https://github.com/tzapu/WiFiManager
 
 #define SD_CS         47          // Pin CS (Chip Select) do komunikacji z kartą SD, wybierany jako interfejs SPI
 #define SPI_MOSI      48          // Pin MOSI (Master Out Slave In) dla interfejsu SPI
@@ -52,15 +52,19 @@
 #define LICZNIK_S4 16             // Numer pinu dla enkodera/licznika S4
 #define MAX_FILES 100             // Maksymalna liczba plików lub katalogów w tablicy directories
 
+int gainLowPass = -3;
+int gainBandPass = 0;
+int gainHighPass = 9;
+
 int currentSelection = 0;         // Numer domyślnie zaznaczonego pierwszego katalogu na ekranie OLED
 int firstVisibleLine = 0;         // Numer pierwszej widocznej linii na ekranie OLED z wyborem katalogów odczytanych z karty SD
 int button_S1 = 17;               // Przycisk S1 podłączony do pinu 17
 int button_S2 = 18;               // Przycisk S2 podłączony do pinu 18
 int button_S3 = 15;               // Przycisk S3 podłączony do pinu 15
 int button_S4 = 16;               // Przycisk S4 podłączony do pinu 16
-int station_nr = 4;               // Numer aktualnie wybranej stacji radiowej z listy, domyślnie stacja nr 4
+int station_nr = 13;               // Numer aktualnie wybranej stacji radiowej z listy, domyślnie stacja nr 4
 int bank_nr = 1;                  // Numer aktualnie wybranego banku stacji z listy, domyślnie bank nr 1
-int encoderCounter1 = 12;         // Początkowa środkowa wartość ustawienia poziomu głośności - prawy encoder
+int encoderCounter1 = 10;         // Początkowa środkowa wartość ustawienia poziomu głośności - prawy encoder
 int encoderCounter2 = 1;          // Licznik lewy encoder, zaczynam od 1
 int CLK_state1;                   // Aktualny stan CLK enkodera prawego
 int prev_CLK_state1;              // Poprzedni stan CLK enkodera prawego    
@@ -116,10 +120,14 @@ Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, 
 ezButton button1(SW_PIN1);                // Utworzenie obiektu przycisku z enkodera 1 ezButton, podłączonego do pinu 4
 ezButton button2(SW_PIN2);                // Utworzenie obiektu przycisku z enkodera 1 ezButton, podłączonego do pinu 1
 Audio audio;                              // Obiekt do obsługi funkcji związanych z dźwiękiem i audio
-WiFiMulti wifiMulti;                      // Obiekt do obsługi wielu połączeń WiFi
+//WiFiMulti wifiMulti;                      // Obiekt do obsługi wielu połączeń WiFi
 Ticker timer;                             // Obiekt do obsługi timera
-String ssid =     "brakdostepu";
-String password = "malinowykrul1977comeback";
+//String ssid =     "Jacek";
+//String password = "DG8JU5G68N";
+//String ssid =     "wifi-A9A0";
+//String password = "juxYEuLu91";
+//String ssid =     "Jacek";
+//String password = "DG8JU5G68N";
 char stations[MAX_STATIONS][MAX_LINK_LENGTH + 1];   // Tablica przechowująca linki do stacji radiowych (jedna na stację) +1 dla terminatora null
 
 const char* ntpServer = "pool.ntp.org";      // Adres serwera NTP używany do synchronizacji czasu
@@ -430,14 +438,23 @@ void sanitizeAndSaveStation(const char* station)
 
 void wifi_setup()
 {
-  WiFi.mode(WIFI_STA);  // Ustaw tryb WiFi na klienta (WIFI_STA)
-  wifiMulti.addAP(ssid.c_str(), password.c_str());  // Dodaj dostęp do punktu dostępowego (AP) z zadanymi danymi (SSID i hasło)
-  wifiMulti.run();  // Uruchom konfigurację wielokrotnego dostępu WiFi
-  if(WiFi.status() != WL_CONNECTED) // Sprawdź, czy udało się połączyć z którąś z dostępnych sieci
-  {
-    WiFi.disconnect(true);  // Jeśli nie, rozłącz WiFi, ponownie uruchom konfigurację wielokrotnego dostępu i spróbuj ponownie
-    wifiMulti.run();
-  }
+  //WiFi.mode(WIFI_STA);  // Ustaw tryb WiFi na klienta (WIFI_STA)
+  //wifiMulti.addAP(ssid.c_str(), password.c_str());  // Dodaj dostęp do punktu dostępowego (AP) z zadanymi danymi (SSID i hasło)
+  //wifiMulti.run();  // Uruchom konfigurację wielokrotnego dostępu WiFi
+  //if(WiFi.status() != WL_CONNECTED) // Sprawdź, czy udało się połączyć z którąś z dostępnych sieci
+  //{
+  //  WiFi.disconnect(true);  // Jeśli nie, rozłącz WiFi, ponownie uruchom konfigurację wielokrotnego dostępu i spróbuj ponownie
+  //  wifiMulti.run();
+  //}
+  WiFiManager wm;
+  bool res;
+  res = wm.autoConnect(); // auto generated AP name from chipid
+
+  if(!res) {
+    Serial.println("Failed to connect");
+        // ESP.restart();
+    } 
+    else{
   Serial.println("Połączono z siecią WiFi");
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT); // Konfiguruj pinout dla interfejsu I2S audio
   audio.setVolume(encoderCounter1); // Ustaw głośność na podstawie wartości zmiennej encoderCounter1 w zakresie 0...21
@@ -450,6 +467,7 @@ void wifi_setup()
   display.setCursor(10, 35);
   display.println("connected");
   display.display();
+}
 }
 
 void audio_info(const char *info)
@@ -1111,17 +1129,17 @@ void playFromSelectedFolder()
         if (digitalRead(DT_PIN1) == HIGH)
         {
           encoderCounter1--;
-          if (encoderCounter1 < 5)
+          if (encoderCounter1 < 1)
           {
-            encoderCounter1 = 5;
+            encoderCounter1 = 0;
           }
         }
         else
         {
           encoderCounter1++;
-          if (encoderCounter1 > 15)
+          if (encoderCounter1 > 21)
           {
-            encoderCounter1 = 15;
+            encoderCounter1 = 21;
           }
         }
         audio.setVolume(encoderCounter1); // zakres 0...21
@@ -1463,6 +1481,11 @@ void setup()
   timer.attach(1, updateTimer);   // Ustaw timer, aby wywoływał funkcję updateTimer co sekundę
   fetchStationsFromServer();
   changeStation();
+  audio.setTone(gainLowPass, gainBandPass, gainHighPass);
+  //WiFiManager wm;
+  //bool res;
+  //res = wm.autoConnect(); // auto generated AP name from chipid
+  
 }
 
 void loop()
@@ -1534,17 +1557,17 @@ void loop()
       if (digitalRead(DT_PIN1) == HIGH)
       {
         encoderCounter1--;
-        if (encoderCounter1 < 5)
+        if (encoderCounter1 < 1)
         {
-          encoderCounter1 = 5;
+          encoderCounter1 = 0;
         }
       } 
       else
       {
         encoderCounter1++;
-        if (encoderCounter1 > 15)
+        if (encoderCounter1 > 21)
         {
-          encoderCounter1 = 15;
+          encoderCounter1 = 21;
         }
       }
       Serial.print("Wartość głośności: ");
