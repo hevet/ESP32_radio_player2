@@ -126,8 +126,7 @@ Ticker timer;                             // Obiekt do obsługi timera
 //String password = "DG8JU5G68N";
 //String ssid =     "wifi-A9A0";
 //String password = "juxYEuLu91";
-//String ssid =     "Jacek";
-//String password = "DG8JU5G68N";
+
 char stations[MAX_STATIONS][MAX_LINK_LENGTH + 1];   // Tablica przechowująca linki do stacji radiowych (jedna na stację) +1 dla terminatora null
 
 const char* ntpServer = "pool.ntp.org";      // Adres serwera NTP używany do synchronizacji czasu
@@ -1470,10 +1469,10 @@ void setup()
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
-  display.setCursor(15, 5);
+  display.setCursor(10, 5);
   display.println("Internet");
   display.setTextSize(2);
-  display.setCursor(35, 35);
+  display.setCursor(20, 35);
   display.println("Radio");
   display.display();
   wifi_setup();
@@ -1482,9 +1481,6 @@ void setup()
   fetchStationsFromServer();
   changeStation();
   audio.setTone(gainLowPass, gainBandPass, gainHighPass);
-  //WiFiManager wm;
-  //bool res;
-  //res = wm.autoConnect(); // auto generated AP name from chipid
   
 }
 
