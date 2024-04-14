@@ -30,7 +30,7 @@
 #define SW_PIN2  1                // Podłączenie z pinu 1 do SW na enkoderze lewym (przycisk)
 #define MAX_STATIONS 100          // Maksymalna liczba stacji radiowych, które mogą być przechowywane w jednym banku
 #define MAX_LINK_LENGTH 100       // Maksymalna długość linku do stacji radiowej.
-#define STATIONS_URL    "https://raw.githubusercontent.com/hevet/ESP32_stream2/main/ulubione"    // Adres URL do pliku z listą stacji radiowych.
+#define STATIONS_URL    "https://raw.githubusercontent.com/hevet/ESP32_stream2/main/ulubion"    // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL1   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista1"      // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL2   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista2"      // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL3   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista3"      // Adres URL do pliku z listą stacji radiowych.
@@ -447,7 +447,7 @@ void wifi_setup()
   //}
   WiFiManager wm;
   bool res;
-  res = wm.autoConnect(); // auto generated AP name from chipid
+  res = wm.autoConnect("WIFI_RADIO"); // anonymous ap
 
   if(!res) {
     Serial.println("Failed to connect");
@@ -460,11 +460,11 @@ void wifi_setup()
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
-  display.setCursor(35, 5);
-  display.println("Wi-Fi");
+  display.setCursor(5, 5);
+  display.println("Polaczono");
   display.setTextSize(2);
-  display.setCursor(10, 35);
-  display.println("connected");
+  display.setCursor(20, 35);
+  display.println("z Wi-Fi");
   display.display();
 }
 }
