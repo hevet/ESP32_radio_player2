@@ -30,7 +30,7 @@
 #define SW_PIN2  1                // Podłączenie z pinu 1 do SW na enkoderze lewym (przycisk)
 #define MAX_STATIONS 100          // Maksymalna liczba stacji radiowych, które mogą być przechowywane w jednym banku
 #define MAX_LINK_LENGTH 100       // Maksymalna długość linku do stacji radiowej.
-#define STATIONS_URL    "https://raw.githubusercontent.com/hevet/ESP32_stream2/main/ulubion"    // Adres URL do pliku z listą stacji radiowych.
+#define STATIONS_URL    "https://raw.githubusercontent.com/hevet/ESP32_stream2/main/ulubione"    // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL1   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista1"      // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL2   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista2"      // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL3   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista3"      // Adres URL do pliku z listą stacji radiowych.
@@ -62,7 +62,7 @@ int button_S1 = 17;               // Przycisk S1 podłączony do pinu 17
 int button_S2 = 18;               // Przycisk S2 podłączony do pinu 18
 int button_S3 = 15;               // Przycisk S3 podłączony do pinu 15
 int button_S4 = 16;               // Przycisk S4 podłączony do pinu 16
-int station_nr = 13;               // Numer aktualnie wybranej stacji radiowej z listy, domyślnie stacja nr 4
+int station_nr = 8;               // Numer aktualnie wybranej stacji radiowej z listy, domyślnie stacja nr 4
 int bank_nr = 1;                  // Numer aktualnie wybranego banku stacji z listy, domyślnie bank nr 1
 int encoderCounter1 = 10;         // Początkowa środkowa wartość ustawienia poziomu głośności - prawy encoder
 int encoderCounter2 = 1;          // Licznik lewy encoder, zaczynam od 1
@@ -107,8 +107,8 @@ unsigned long seconds = 0;                // Licznik sekund timera
 
 String directories[MAX_FILES];            // Tablica z indeksami i ścieżkami katalogów
 String currentDirectory = "/";            // Ścieżka bieżącego katalogu
-String stationName;                       // Nazwa aktualnie wybranej stacji radiowej.
-String stationString;                     // Dodatkowe dane stacji radiowej (jeśli istnieją).
+String stationName;                       // Nazwa aktualnie wybranej stacji wej.
+String stationString;                     // Dodatkowe dane stacji wej (jeśli istnieją).
 String bitrateString;                     // Zmienna przechowująca informację o bitrate
 String sampleRateString;                  // Zmienna przechowująca informację o sample rate
 String bitsPerSampleString;               // Zmienna przechowująca informację o liczbie bitów na próbkę
@@ -127,7 +127,7 @@ Ticker timer;                             // Obiekt do obsługi timera
 //String ssid =     "wifi-A9A0";
 //String password = "juxYEuLu91";
 
-char stations[MAX_STATIONS][MAX_LINK_LENGTH + 1];   // Tablica przechowująca linki do stacji radiowych (jedna na stację) +1 dla terminatora null
+char stations[MAX_STATIONS][MAX_LINK_LENGTH + 1];   // Tablica przechowująca linki do stacji wych (jedna na stację) +1 dla terminatora null
 
 const char* ntpServer = "pool.ntp.org";      // Adres serwera NTP używany do synchronizacji czasu
 const long  gmtOffset_sec = 3600;            // Przesunięcie czasu UTC w sekundach
@@ -136,11 +136,11 @@ const int   daylightOffset_sec = 3600;       // Przesunięcie czasu letniego w s
 enum MenuOption
 {
   PLAY_FILES,          // Odtwarzacz plików
-  INTERNET_RADIO,      // Radio internetowe
-  BANK_LIST,           // Lista banków stacji radiowych
+  INTERNET_,      //  internetowe
+  BANK_LIST,           // Lista banków stacji wych
   REC_AUDIO            // Nagrywanie audio
 };
-MenuOption currentOption = INTERNET_RADIO;  // Aktualnie wybrana opcja menu (domyślnie radio internetowe)
+MenuOption currentOption = INTERNET_;  // Aktualnie wybrana opcja menu (domyślnie  internetowe)
 
 bool isAudioFile(const char *filename)
 {
@@ -245,7 +245,7 @@ void saveStationToEEPROM(const char* station)
   }
 }
 
-// Funkcja odpowiedzialna za zmianę aktualnie wybranej stacji radiowej.
+// Funkcja odpowiedzialna za zmianę aktualnie wybranej stacji wej.
 void changeStation()
 {  
   stationString.remove(0);  // Usunięcie wszystkich znaków z obiektu stationString
@@ -447,7 +447,7 @@ void wifi_setup()
   //}
   WiFiManager wm;
   bool res;
-  res = wm.autoConnect("WIFI_RADIO"); // anonymous ap
+  res = wm.autoConnect("WIFI_"); // anonymous ap
 
   if(!res) {
     Serial.println("Failed to connect");
@@ -531,7 +531,7 @@ void audio_info(const char *info)
     mp3 = false;
   }
 
-  if (currentOption == INTERNET_RADIO)
+  if (currentOption == INTERNET_)
   {
     display.setTextSize(1);
     display.setTextColor(SH110X_WHITE);
@@ -831,25 +831,25 @@ void displayMenu()
     case PLAY_FILES:
       display.println(">> Odtwarzacz plik" + String((char)0x0F) + "w");
       display.println("   Nagrywanie audio ");
-      display.println("   Radio internetowe");
+      display.println("    internetowe");
       display.println("   Lista bank"  + String((char)0x0F) + "w");
       break;
     case REC_AUDIO:
       display.println("   Odtwarzacz plik" + String((char)0x0F) + "w");
       display.println(">> Nagrywanie audio ");
-      display.println("   Radio internetowe");
+      display.println("    internetowe");
       display.println("   Lista bank"  + String((char)0x0F) + "w");
       break;
-    case INTERNET_RADIO:
+    case INTERNET_:
       display.println("   Odtwarzacz plik" + String((char)0x0F) + "w");
       display.println("   Nagrywanie audio ");
-      display.println(">> Radio internetowe");
+      display.println(">>  internetowe");
       display.println("   Lista bank"  + String((char)0x0F) + "w");
       break;
     case BANK_LIST:
       display.println("   Odtwarzacz plik" + String((char)0x0F) + "w");
       display.println("   Nagrywanie audio ");
-      display.println("   Radio internetowe");
+      display.println("    internetowe");
       display.println(">> Lista bank"  + String((char)0x0F) + "w");
       break;
   }
@@ -964,7 +964,7 @@ void scrollUp()
 
 void scrollDown()
 {
-  if (currentOption == INTERNET_RADIO)
+  if (currentOption == INTERNET_)
   {
     if (currentSelection < stationsCount - 1)
     {
@@ -1304,14 +1304,14 @@ void printFoldersToOLED()
   display.display();
 }
 
-// Funkcja do drukowania listy stacji radiowych na ekranie OLED z uwzględnieniem zaznaczenia
+// Funkcja do drukowania listy stacji wych na ekranie OLED z uwzględnieniem zaznaczenia
 void printStationsToOLED()
 {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
   display.setCursor(0, 0);
-  display.println("   STACJE RADIOWE    ");
+  display.println("   STACJE WE    ");
 
   int displayRow = 1;  // Zaczynamy od drugiego wiersza (pierwszy to nagłówek)
 
@@ -1414,7 +1414,7 @@ void updateTimer()  // Wywoływana co sekundę przez timer
       display.print(timeString);
       display.display();
     }
-    if (currentOption == INTERNET_RADIO)
+    if (currentOption == INTERNET_)
     {
       printLocalTime();
     }
@@ -1472,7 +1472,7 @@ void setup()
   display.setCursor(10, 5);
   display.println("Internet");
   display.setTextSize(2);
-  display.setCursor(20, 35);
+  display.setCursor(25, 35);
   display.println("Radio");
   display.display();
   wifi_setup();
