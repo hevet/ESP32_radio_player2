@@ -447,7 +447,7 @@ void wifi_setup()
   //}
   WiFiManager wm;
   bool res;
-  res = wm.autoConnect("WIFI_"); // anonymous ap
+  res = wm.autoConnect("WIFI_RADIO"); // anonymous ap
 
   if(!res) {
     Serial.println("Failed to connect");
