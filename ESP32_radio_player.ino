@@ -460,8 +460,6 @@ void wifi_setup()
     } 
     else{
   Serial.println("Połączono z siecią WiFi");
-  audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT); // Konfiguruj pinout dla interfejsu I2S audio
-  audio.setVolume(encoderCounter1); // Ustaw głośność na podstawie wartości zmiennej encoderCounter1 w zakresie 0...21
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
