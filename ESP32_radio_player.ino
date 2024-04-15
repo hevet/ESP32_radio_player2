@@ -1,3 +1,4 @@
+
 #include "Arduino.h"              // Standardowy nagłówek Arduino, który dostarcza podstawowe funkcje i definicje
 //#include "WiFiMulti.h"            // Biblioteka do obsługi wielu połączeń WiFi
 #include "Audio.h"                // Biblioteka do obsługi funkcji związanych z dźwiękiem i audio
@@ -56,16 +57,17 @@ int gainLowPass = -3;
 int gainBandPass = 0;
 int gainHighPass = 9;
 
-int currentSelection = 0;         // Numer domyślnie zaznaczonego pierwszego katalogu na ekranie OLED
-int firstVisibleLine = 0;         // Numer pierwszej widocznej linii na ekranie OLED z wyborem katalogów odczytanych z karty SD
+int currentSelection = 0;         // Numer aktualnego wyboru na ekranie OLED
+int firstVisibleLine = 0;         // Numer pierwszej widocznej linii na ekranie OLED
 int button_S1 = 17;               // Przycisk S1 podłączony do pinu 17
 int button_S2 = 18;               // Przycisk S2 podłączony do pinu 18
 int button_S3 = 15;               // Przycisk S3 podłączony do pinu 15
 int button_S4 = 16;               // Przycisk S4 podłączony do pinu 16
 int station_nr = 8;               // Numer aktualnie wybranej stacji radiowej z listy, domyślnie stacja nr 4
+int stationFromBuffer = 0;        // Numer stacji radiowej przechowywanej w buforze do przywrocenia na ekran po bezczynności
 int bank_nr = 1;                  // Numer aktualnie wybranego banku stacji z listy, domyślnie bank nr 1
-int encoderCounter1 = 10;         // Początkowa środkowa wartość ustawienia poziomu głośności - prawy encoder
-int encoderCounter2 = 1;          // Licznik lewy encoder, zaczynam od 1
+int encoderCounter1 = 0;          // Licznik prawego encodera
+int encoderCounter2 = 0;          // Licznik lewego encodera
 int CLK_state1;                   // Aktualny stan CLK enkodera prawego
 int prev_CLK_state1;              // Poprzedni stan CLK enkodera prawego    
 int CLK_state2;                   // Aktualny stan CLK enkodera lewego
@@ -77,8 +79,11 @@ int licznik_S4 = 0;               // Licznik dla przycisku S4
 int stationsCount = 0;            // Aktualna liczba przechowywanych stacji w tablicy
 int directoryCount = 0;           // Licznik katalogów
 int fileIndex = 0;                // Numer aktualnie wybranego pliku audio ze wskazanego folderu
-int folderIndex = 1;              // Numer domyślnie wybranego folderu podczas przełączenia do odtwarzania z karty SD
+int folderIndex = 0;              // Numer aktualnie wybranego folderu podczas przełączenia do odtwarzania z karty SD
+//int wifiIndex = 0;                // Numer aktualnie wybranej sieci WiFi z listy
 int totalFilesInFolder = 0;       // Zmienna przechowująca łączną liczbę plików w folderze
+//int numberOfNetworks = 0;         // Liczba znalezionych sieci WiFi
+int volumeValue = 12;             // Wartość głośności, domyślnie ustawiona na 12
 const int maxVisibleLines = 5;    // Maksymalna liczba widocznych linii na ekranie OLED
 bool button_1 = false;            // Flaga określająca stan przycisku 1
 bool button_2 = false;            // Flaga określająca stan przycisku 2
@@ -95,7 +100,8 @@ bool aac = false;                 // Flaga określająca, czy aktualny plik audi
 bool noID3data = false;           // Flaga określająca, czy plik audio posiada dane ID3
 bool timeDisplay = true;          // Flaga określająca kiedy pokazać czas na wyświetlaczu, domyślnie od razu po starcie
 bool listedStations = false;      // Flaga określająca czy na ekranie jest pokazana lista stacji do wyboru
-bool menuEnable = false;           // Flaga określająca czy na ekranie można wyświetlić menu
+bool menuEnable = false;          // Flaga określająca czy na ekranie można wyświetlić menu
+//bool enterWiFiPassword = false;   // Flaga określająca czy na ekranie można wpisać hasło sieci
 unsigned long lastDebounceTime_S1 = 0;    // Czas ostatniego debouncingu dla przycisku S1.
 unsigned long lastDebounceTime_S2 = 0;    // Czas ostatniego debouncingu dla przycisku S2.
 unsigned long lastDebounceTime_S3 = 0;    // Czas ostatniego debouncingu dla przycisku S3.
@@ -107,14 +113,15 @@ unsigned long seconds = 0;                // Licznik sekund timera
 
 String directories[MAX_FILES];            // Tablica z indeksami i ścieżkami katalogów
 String currentDirectory = "/";            // Ścieżka bieżącego katalogu
-String stationName;                       // Nazwa aktualnie wybranej stacji wej.
-String stationString;                     // Dodatkowe dane stacji wej (jeśli istnieją).
+String stationName;                       // Nazwa aktualnie wybranej stacji radiowej.
+String stationString;                     // Dodatkowe dane stacji radiowej (jeśli istnieją).
 String bitrateString;                     // Zmienna przechowująca informację o bitrate
 String sampleRateString;                  // Zmienna przechowująca informację o sample rate
 String bitsPerSampleString;               // Zmienna przechowująca informację o liczbie bitów na próbkę
 String artistString;                      // Zmienna przechowująca informację o wykonawcy
 String titleString;                       // Zmienna przechowująca informację o tytule utworu
 String fileNameString;                    // Zmienna przechowująca informację o nazwie pliku
+String ssidName;
 
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);    //Inicjalizacja obiektu wyświetlacza OLED
 ezButton button1(SW_PIN1);                // Utworzenie obiektu przycisku z enkodera 1 ezButton, podłączonego do pinu 4
@@ -122,12 +129,9 @@ ezButton button2(SW_PIN2);                // Utworzenie obiektu przycisku z enko
 Audio audio;                              // Obiekt do obsługi funkcji związanych z dźwiękiem i audio
 //WiFiMulti wifiMulti;                      // Obiekt do obsługi wielu połączeń WiFi
 Ticker timer;                             // Obiekt do obsługi timera
-//String ssid =     "Jacek";
-//String password = "DG8JU5G68N";
 //String ssid =     "wifi-A9A0";
 //String password = "juxYEuLu91";
-
-char stations[MAX_STATIONS][MAX_LINK_LENGTH + 1];   // Tablica przechowująca linki do stacji wych (jedna na stację) +1 dla terminatora null
+char stations[MAX_STATIONS][MAX_LINK_LENGTH + 1];   // Tablica przechowująca linki do stacji radiowych (jedna na stację) +1 dla terminatora null
 
 const char* ntpServer = "pool.ntp.org";      // Adres serwera NTP używany do synchronizacji czasu
 const long  gmtOffset_sec = 3600;            // Przesunięcie czasu UTC w sekundach
@@ -136,11 +140,11 @@ const int   daylightOffset_sec = 3600;       // Przesunięcie czasu letniego w s
 enum MenuOption
 {
   PLAY_FILES,          // Odtwarzacz plików
-  INTERNET_,      //  internetowe
-  BANK_LIST,           // Lista banków stacji wych
-  REC_AUDIO            // Nagrywanie audio
+  INTERNET_RADIO,      // Radio internetowe
+  BANK_LIST,           // Lista banków stacji radiowych
+  //WIFI_LIST            // Wybór sieci wifi
 };
-MenuOption currentOption = INTERNET_;  // Aktualnie wybrana opcja menu (domyślnie  internetowe)
+MenuOption currentOption = INTERNET_RADIO;  // Aktualnie wybrana opcja menu (domyślnie radio internetowe)
 
 bool isAudioFile(const char *filename)
 {
@@ -245,7 +249,7 @@ void saveStationToEEPROM(const char* station)
   }
 }
 
-// Funkcja odpowiedzialna za zmianę aktualnie wybranej stacji wej.
+// Funkcja odpowiedzialna za zmianę aktualnie wybranej stacji radiowej.
 void changeStation()
 {  
   stationString.remove(0);  // Usunięcie wszystkich znaków z obiektu stationString
@@ -292,6 +296,7 @@ void changeStation()
   // Połącz z daną stacją
   audio.connecttohost(station);
   seconds = 0;
+  stationFromBuffer = station_nr;
 }
 
 void fetchStationsFromServer()
@@ -531,7 +536,7 @@ void audio_info(const char *info)
     mp3 = false;
   }
 
-  if (currentOption == INTERNET_)
+  if (currentOption == INTERNET_RADIO)
   {
     display.setTextSize(1);
     display.setTextColor(SH110X_WHITE);
@@ -830,26 +835,26 @@ void displayMenu()
   {
     case PLAY_FILES:
       display.println(">> Odtwarzacz plik" + String((char)0x0F) + "w");
-      display.println("   Nagrywanie audio ");
-      display.println("    internetowe");
+      //display.println("   Lista sieci WiFi ");
+      display.println("   Radio internetowe");
       display.println("   Lista bank"  + String((char)0x0F) + "w");
       break;
-    case REC_AUDIO:
+    //case WIFI_LIST:
+      //display.println("   Odtwarzacz plik" + String((char)0x0F) + "w");
+      //display.println(">> Lista sieci WiFi ");
+      //display.println("   Radio internetowe");
+      //display.println("   Lista bank"  + String((char)0x0F) + "w");
+      //break;
+    case INTERNET_RADIO:
       display.println("   Odtwarzacz plik" + String((char)0x0F) + "w");
-      display.println(">> Nagrywanie audio ");
-      display.println("    internetowe");
-      display.println("   Lista bank"  + String((char)0x0F) + "w");
-      break;
-    case INTERNET_:
-      display.println("   Odtwarzacz plik" + String((char)0x0F) + "w");
-      display.println("   Nagrywanie audio ");
-      display.println(">>  internetowe");
+      //display.println("   Lista sieci WiFi ");
+      display.println(">> Radio internetowe");
       display.println("   Lista bank"  + String((char)0x0F) + "w");
       break;
     case BANK_LIST:
       display.println("   Odtwarzacz plik" + String((char)0x0F) + "w");
-      display.println("   Nagrywanie audio ");
-      display.println("    internetowe");
+      //display.println("   Lista sieci WiFi ");
+      display.println("   Radio internetowe");
       display.println(">> Lista bank"  + String((char)0x0F) + "w");
       break;
   }
@@ -958,38 +963,39 @@ void scrollUp()
     }
   }
   // Dodaj dodatkowy wydruk do diagnostyki
-  //Serial.print("Scroll Up: CurrentSelection = ");
-  //Serial.println(currentSelection);
+  Serial.print("Scroll Up: CurrentSelection = ");
+  Serial.println(currentSelection);
 }
 
 void scrollDown()
 {
-  if (currentOption == INTERNET_)
+  if (currentSelection < maxSelection())
   {
-    if (currentSelection < stationsCount - 1)
+    currentSelection++;
+    if (currentSelection >= firstVisibleLine + maxVisibleLines)
     {
-      currentSelection++;
-      if (currentSelection >= firstVisibleLine + maxVisibleLines)
-      {
-        firstVisibleLine++;
-      }
+      firstVisibleLine++;
     }
+    // Dodaj dodatkowy wydruk do diagnostyki
+    Serial.print("Scroll Down: CurrentSelection = ");
+    Serial.println(currentSelection);
   }
-  if (currentOption == PLAY_FILES)
-  {
-    if (currentSelection < directoryCount - 1)
-    {
-      currentSelection++;
-      if (currentSelection >= firstVisibleLine + maxVisibleLines)
-      {
-        firstVisibleLine++;
-      }
-    }
-  }
-  // Dodaj dodatkowy wydruk do diagnostyki
-  //Serial.print("Scroll Down: CurrentSelection = ");
-  //Serial.println(currentSelection);
 }
+
+int maxSelection()
+{
+  if (currentOption == INTERNET_RADIO)
+  {
+    return stationsCount - 1;
+  }
+  else if (currentOption == PLAY_FILES)
+  {
+    return directoryCount - 1;
+  }
+  return 0; // Zwraca 0, jeśli żaden warunek nie jest spełniony
+}
+
+
 
 void playFromSelectedFolder()
 {
@@ -1054,9 +1060,10 @@ void playFromSelectedFolder()
       button1.loop();
       button2.loop();
 
-      if (button_2) //Przejście do kolejnego pliku w folderze
+      if (button_1) //Przejście do kolejnego pliku w folderze
       {
-        button_2 = false;
+        licznik_S1 = 0;
+        button_1 = false;
         isPlaying = false;
         audio.stopSong();
         fileIndex++;
@@ -1069,9 +1076,10 @@ void playFromSelectedFolder()
         break;            // Wyjdź z pętli
       }
 
-      if (button_1) //Przejście do poprzedniego pliku w folderze
+      if (button_2) //Przejście do poprzedniego pliku w folderze
       {
-        button_1 = false;
+        licznik_S2 = 0;
+        button_2 = false;
         audio.stopSong();
         fileIndex--;
         if (fileIndex < 1)
@@ -1127,23 +1135,23 @@ void playFromSelectedFolder()
         displayStartTime = millis();
         if (digitalRead(DT_PIN1) == HIGH)
         {
-          encoderCounter1--;
-          if (encoderCounter1 < 1)
+          volumeValue--;
+          if (volumeValue < 1)
           {
-            encoderCounter1 = 0;
+            volumeValue = 0;
           }
         }
         else
         {
-          encoderCounter1++;
-          if (encoderCounter1 > 21)
+          volumeValue++;
+          if (volumeValue > 21)
           {
-            encoderCounter1 = 21;
+            volumeValue = 21;
           }
         }
-        audio.setVolume(encoderCounter1); // zakres 0...21
+        audio.setVolume(volumeValue); // zakres 0...21
         Serial.print("Wartość głośności: ");
-        Serial.println(encoderCounter1);
+        Serial.println(volumeValue);
         display.clearDisplay();
         display.setTextSize(2);
         display.setTextColor(SH110X_WHITE);
@@ -1151,7 +1159,7 @@ void playFromSelectedFolder()
         display.println("Volume set");
         display.setTextSize(3);
         display.setCursor(48, 30);
-        display.println(encoderCounter1);
+        display.println(volumeValue);
         display.display();
       }
       prev_CLK_state1 = CLK_state1;
@@ -1159,28 +1167,29 @@ void playFromSelectedFolder()
       CLK_state2 = digitalRead(CLK_PIN2);
       if (CLK_state2 != prev_CLK_state2 && CLK_state2 == HIGH)
       {
+        folderIndex = currentSelection;
         timeDisplay = false;
         if (digitalRead(DT_PIN2) == HIGH)
         {
-          encoderCounter2--;
-          if (encoderCounter2 < 1)
+          folderIndex--;
+          if (folderIndex < 1)
           {
-            encoderCounter2 = 1;
+            folderIndex = 1;
           }
-          Serial.print("Wartość licznika lewego enkodera: ");
-          Serial.println(encoderCounter2);
+          Serial.print("Numer folderu: ");
+          Serial.println(folderIndex);
           scrollUp();
           printFoldersToOLED();
         }
         else
         {
-          encoderCounter2++;
-          if (encoderCounter2 > (directoryCount - 1))
+          folderIndex++;
+          if (folderIndex > (directoryCount - 1))
           {
-            encoderCounter2 = directoryCount - 1;
+            folderIndex = directoryCount - 1;
           }
-          Serial.print("Wartość licznika lewego enkodera: ");
-          Serial.println(encoderCounter2);
+          Serial.print("Numer folderu: ");
+          Serial.println(folderIndex);
           scrollDown();
           printFoldersToOLED();
         }
@@ -1224,7 +1233,6 @@ void playFromSelectedFolder()
       if (button2.isPressed())
       {
         audio.stopSong();
-        folderIndex = encoderCounter2;
         playFromSelectedFolder();
       }
 
@@ -1246,6 +1254,7 @@ void playFromSelectedFolder()
   }
   root.close();
 }
+
 
 // Funkcja do drukowania folderów na ekranie OLED z uwzględnieniem zaznaczenia
 void printFoldersToOLED()
@@ -1304,14 +1313,14 @@ void printFoldersToOLED()
   display.display();
 }
 
-// Funkcja do drukowania listy stacji wych na ekranie OLED z uwzględnieniem zaznaczenia
+// Funkcja do drukowania listy stacji radiowych na ekranie OLED z uwzględnieniem zaznaczenia
 void printStationsToOLED()
 {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
   display.setCursor(0, 0);
-  display.println("   STACJE WE    ");
+  display.println("   STACJE RADIOWE    ");
 
   int displayRow = 1;  // Zaczynamy od drugiego wiersza (pierwszy to nagłówek)
 
@@ -1414,12 +1423,14 @@ void updateTimer()  // Wywoływana co sekundę przez timer
       display.print(timeString);
       display.display();
     }
-    if (currentOption == INTERNET_)
+    if (currentOption == INTERNET_RADIO)
     {
       printLocalTime();
     }
   }
 }
+
+
 
 void setup()
 {
@@ -1430,6 +1441,8 @@ void setup()
   // Konfiguruj piny enkodera jako wejścia
   pinMode(CLK_PIN1, INPUT);
   pinMode(DT_PIN1, INPUT);
+  pinMode(CLK_PIN2, INPUT);
+  pinMode(DT_PIN2, INPUT);
 
   // Ustaw czas odbicia dla przycisków enkodera na 50 milisekund
   //button1.setDebounceTime(50);
@@ -1451,6 +1464,9 @@ void setup()
   attachInterrupt(LICZNIK_S3, zlicz_S3, RISING);
   attachInterrupt(LICZNIK_S4, zlicz_S4, RISING);
 
+  audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT); // Konfiguruj pinout dla interfejsu I2S audio
+  audio.setVolume(volumeValue); // Ustaw głośność na podstawie wartości zmiennej encoderCounter1 w zakresie 0...21
+
   // Inicjalizuj interfejs SPI dla obsługi wyświetlacza OLED
   SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
   SPI.setFrequency(1000000);
@@ -1469,10 +1485,10 @@ void setup()
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
-  display.setCursor(10, 5);
+  display.setCursor(15, 5);
   display.println("Internet");
   display.setTextSize(2);
-  display.setCursor(25, 35);
+  display.setCursor(35, 35);
   display.println("Radio");
   display.display();
   wifi_setup();
@@ -1481,7 +1497,6 @@ void setup()
   fetchStationsFromServer();
   changeStation();
   audio.setTone(gainLowPass, gainBandPass, gainHighPass);
-  
 }
 
 void loop()
@@ -1496,7 +1511,7 @@ void loop()
     timeDisplay = false;
     displayActive = true;
     displayStartTime = millis();
-    if (menuEnable == true)  // Przewijanie menu enkoderem prawym
+    if (menuEnable == true)  // Przewijanie menu prawym enkoderem
     {
       int DT_state1 = digitalRead(DT_PIN1);
       switch(currentOption)
@@ -1508,14 +1523,14 @@ void loop()
           }
           else
           {
-            currentOption = REC_AUDIO;
+            currentOption = INTERNET_RADIO;
           }
           break;
           
         case INTERNET_RADIO:
           if (DT_state1 == HIGH)
           {
-            currentOption = REC_AUDIO;
+            currentOption = PLAY_FILES;
           }
           else
           {
@@ -1526,7 +1541,7 @@ void loop()
         case BANK_LIST:
           if (DT_state1 == HIGH)
           {
-            currentOption = INTERNET_RADIO;
+            
           }
           else
           {
@@ -1534,16 +1549,16 @@ void loop()
           }
           break;
           
-        case REC_AUDIO:
-          if (DT_state1 == HIGH)
-          {
-            currentOption = PLAY_FILES;
-          }
-          else
-          {
-            currentOption = INTERNET_RADIO;
-          }
-          break;
+        //case WIFI_LIST:
+          //if (DT_state1 == HIGH)
+          //{
+            //currentOption = PLAY_FILES;
+          //}
+          //else
+          //{
+            //currentOption = INTERNET_RADIO;
+          //}
+          //break;
       }
       displayMenu();
     }
@@ -1552,23 +1567,23 @@ void loop()
     {
       if (digitalRead(DT_PIN1) == HIGH)
       {
-        encoderCounter1--;
-        if (encoderCounter1 < 1)
+        volumeValue--;
+        if (volumeValue < 1)
         {
-          encoderCounter1 = 0;
+          volumeValue = 0;
         }
       } 
       else
       {
-        encoderCounter1++;
-        if (encoderCounter1 > 21)
+        volumeValue++;
+        if (volumeValue > 21)
         {
-          encoderCounter1 = 21;
+          volumeValue = 21;
         }
       }
       Serial.print("Wartość głośności: ");
-      Serial.println(encoderCounter1);
-      audio.setVolume(encoderCounter1); // zakres 0...21
+      Serial.println(volumeValue);
+      audio.setVolume(volumeValue); // zakres 0...21
       display.clearDisplay();
       display.setTextSize(2);
       display.setTextColor(SH110X_WHITE);
@@ -1576,7 +1591,7 @@ void loop()
       display.println("Volume set");
       display.setTextSize(3);
       display.setCursor(48, 30);
-      display.println(encoderCounter1);
+      display.println(volumeValue);
       display.display();
     }
   }
@@ -1589,52 +1604,55 @@ void loop()
     displayActive = true;
     displayStartTime = millis();
 
-    if (currentOption == INTERNET_RADIO)
+    if (currentOption == INTERNET_RADIO)  // Przewijanie listy stacji radiowych
     {
+      station_nr = currentSelection + 1;
       if (digitalRead(DT_PIN2) == HIGH)
       {
-        encoderCounter2--;
-        if (encoderCounter2 < 1)
+        station_nr--;
+        if (station_nr < 1)
         {
-          encoderCounter2 = 1;
+          station_nr = 1;
         }
+        Serial.print("Numer stacji: ");
+        Serial.println(station_nr);
         scrollUp();
         printStationsToOLED();
       }
       else
       {
-        encoderCounter2++;
-        if (encoderCounter2 > stationsCount)
+        station_nr++;
+        if (station_nr > stationsCount)
         {
-          encoderCounter2 = stationsCount;
+          station_nr = stationsCount;
         }
+        Serial.print("Numer stacji: ");
+        Serial.println(station_nr);
         scrollDown();
         printStationsToOLED();
       }
-      //Serial.print("Numer wybranej stacji: ");
-      //Serial.println(station_nr);
     }
 
-    if (currentOption == BANK_LIST)
+    if (currentOption == BANK_LIST) // Przewijanie listy banków stacji radiowych
     {
       if (digitalRead(DT_PIN2) == HIGH)
       {
-        encoderCounter2--;
-        if (encoderCounter2 < 1)
+        bank_nr--;
+        if (bank_nr < 1)
         {
-          encoderCounter2 = 1;
+          bank_nr = 1;
         }
       } 
       else
       {
-        encoderCounter2++;
-        if (encoderCounter2 > 16)
+        bank_nr++;
+        if (bank_nr > 16)
         {
-          encoderCounter2 = 16;
+          bank_nr = 16;
         }
       }
       Serial.print("Numer banku: ");
-      Serial.println(encoderCounter2);
+      Serial.println(bank_nr);
       display.clearDisplay();
       display.setTextSize(2);
       display.setTextColor(SH110X_WHITE);
@@ -1642,7 +1660,7 @@ void loop()
       display.println("Bank nr");
       display.setTextSize(3);
       display.setCursor(55, 30);
-      display.println(encoderCounter2);
+      display.println(bank_nr);
       display.display();
     }
   }
@@ -1677,7 +1695,7 @@ void loop()
     display.setCursor(0, 47);
     display.println(bitrateString.substring(1) + "b/s  Bank " + String(bank_nr));
     display.setCursor(66, 56);
-    display.println("Stacja " + String(station_nr));
+    display.println("Stacja " + String(stationFromBuffer));
     display.display();
     displayActive = false;
     timeDisplay = true;
@@ -1685,189 +1703,164 @@ void loop()
     menuEnable = false;
   }
   
-  if (button1.isPressed())  //Przycisk enkodera prawego wciśnięty
-  {
-    display.clearDisplay();
-    Serial.println("Przycisk enkodera prawego");
-    if (currentOption == PLAY_FILES)
-    {
-      if (!SD.begin(SD_CS))
-      {
-        Serial.println("Błąd inicjalizacji karty SD!");
-        return;
-      }
-      display.setTextSize(1);
-      display.setTextColor(SH110X_WHITE);
-      display.setCursor(0, 0);
-      display.println("   LISTA KATALOG" + String((char)0x1F) + "W"); // Wyświetla komunikat "LISTA KATALOGÓW" na ekranie, 0x1F reprezentuje literę 'Ó'
-      display.display();
-      folderIndex = 1;
-      currentSelection = 0;
-      firstVisibleLine = 0;
-      listDirectories("/");
-      playFromSelectedFolder();
-    }
-    else
-    {
-      timeDisplay = false;
-      displayMenu();
-      menuEnable = true;
-      displayActive = true;
-      displayStartTime = millis();
-    }
-  }
-
-  if (button2.isPressed())  //Przycisk enkodera lewego wciśnięty
-  {
-    Serial.println("Przycisk enkodera lewego");
-    display.clearDisplay();
-    timeDisplay = false;
-
-    if (currentOption == PLAY_FILES)
-    {
-      if (!SD.begin(SD_CS))
-      {
-        Serial.println("Błąd inicjalizacji karty SD!");
-        return;
-      }
-      display.setTextSize(1);
-      display.setTextColor(SH110X_WHITE);
-      display.setCursor(0, 0);
-      display.println("   LISTA KATALOG" + String((char)0x1F) + "W"); // Wyświetla komunikat "LISTA KATALOGÓW" na ekranie, 0x1F reprezentuje literę 'Ó'
-      display.display();
-      folderIndex = 1;
-      currentSelection = 0;
-      firstVisibleLine = 0;
-      listDirectories("/");
-      playFromSelectedFolder();
-    }
   
-    if (currentOption == INTERNET_RADIO) 
-    {
-      station_nr = encoderCounter2;
-      changeStation();
-    }
 
-    if (currentOption == BANK_LIST)
+
+  if ((currentOption == PLAY_FILES) && (button1.isPressed()) && (menuEnable == true))
+  {
+    if (!SD.begin(SD_CS))
     {
-      bank_nr = encoderCounter2;
-      encoderCounter2 = 0;
-      currentSelection = 0;
-      firstVisibleLine = 0;
-      station_nr = 1;
-      currentOption = INTERNET_RADIO;
-      fetchStationsFromServer();
-      changeStation();
+      Serial.println("Błąd inicjalizacji karty SD!");
+      return;
     }
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SH110X_WHITE);
+    display.setCursor(0, 0);
+    display.println("   LISTA KATALOG" + String((char)0x1F) + "W"); // Wyświetla komunikat "LISTA KATALOGÓW" na ekranie, 0x1F reprezentuje literę 'Ó'
+    display.display();
+    folderIndex = 1;
+    currentSelection = 0;
+    firstVisibleLine = 0;
+    listDirectories("/");
+    playFromSelectedFolder();
   }
+
+  if ((currentOption == INTERNET_RADIO) && (button1.isPressed()) && (menuEnable == true))
+  {
+    changeStation();
+  }
+
+
+  
+  if (button1.isPressed())
+  {
+    timeDisplay = false;
+    displayMenu();
+    menuEnable = true;
+    displayActive = true;
+    displayStartTime = millis();
+  }
+
+  if ((currentOption == INTERNET_RADIO) && (button2.isPressed()))
+  {
+    changeStation();
+  }
+
+  if ((currentOption == BANK_LIST) && (button2.isPressed()))
+  {
+    display.clearDisplay();
+    encoderCounter2 = 0;
+    currentSelection = 0;
+    firstVisibleLine = 0;
+    station_nr = 1;
+    currentOption = INTERNET_RADIO;
+    fetchStationsFromServer();
+    changeStation();
+  }
+  
+
+
 
   // Obsługa przycisku S1
   if (button_1)
   {
-    if ((millis() - lastDebounceTime_S1) > debounceDelay)
+    licznik_S1 = 0;
+    button_1 = mp3 = aac = flac = false;
+    Serial.println("Przycisk S1 został wciśnięty");
+    if (currentOption == INTERNET_RADIO)
     {
-      licznik_S1 = 0;
-      lastDebounceTime_S1 = millis();
-      button_1 = mp3 = aac = flac = false;
-      Serial.println("Przycisk S1 został wciśnięty");
-      if (currentOption == INTERNET_RADIO)
+      station_nr++;
+      if (station_nr > stationsCount)
       {
-        station_nr++;
-        if (station_nr > stationsCount)
-        {
-          station_nr = 1;
-        }
-        Serial.println(station_nr);
-        changeStation();
+        station_nr = 1;
       }
+      Serial.println(station_nr);
+      changeStation();
     }
   }
 
   // Obsługa przycisku S2
   if (button_2)
   {
-    if ((millis() - lastDebounceTime_S2) > debounceDelay)
+    licznik_S2 = 0;
+    button_2 = mp3 = aac = flac = false;
+    Serial.println("Przycisk S2 został wciśnięty");
+    if (currentOption == INTERNET_RADIO)
     {
-      licznik_S2 = 0;
-      lastDebounceTime_S2 = millis();
-      button_2 = mp3 = aac = flac = false;
-      Serial.println("Przycisk S2 został wciśnięty");
-      if (currentOption == INTERNET_RADIO)
+      station_nr--;
+      if (station_nr < 1)
       {
-        station_nr--;
-        if (station_nr < 1)
-        {
-          station_nr = stationsCount;
-        }
-        Serial.println(station_nr);
-        changeStation();
+        station_nr = stationsCount;
       }
+      Serial.println(station_nr);
+      changeStation();
     }
   }
 
   // Obsługa przycisku S3
   if (button_3)
   {
-    if ((millis() - lastDebounceTime_S3) > debounceDelay)
+    licznik_S3 = 0;
+    button_3 = mp3 = aac = flac = false;
+    Serial.println("Przycisk S3 został wciśnięty");
+    if (currentOption == INTERNET_RADIO)
     {
-      licznik_S3 = 0;
-      lastDebounceTime_S3 = millis();
-      button_3 = mp3 = aac = flac = false;
-      Serial.println("Przycisk S3 został wciśnięty");
-      if (currentOption == INTERNET_RADIO)
+      timeDisplay = false;
+      currentSelection = 0;
+      firstVisibleLine = 0;
+      bank_nr++;
+      if (bank_nr > 16)
       {
-        currentSelection = 0;
-        firstVisibleLine = 0;
-        bank_nr++;
-        station_nr = 1;
-        Serial.println(bank_nr);
-        display.clearDisplay();
-        display.setTextSize(2);
-        display.setTextColor(SH110X_WHITE);
-        display.setCursor(25, 0);
-        display.println("Bank nr");
-        display.setTextSize(3);
-        display.setCursor(55, 30);
-        display.println(bank_nr);
-        display.display();
-        fetchStationsFromServer();
-        changeStation();
+        bank_nr = 16;
       }
+      station_nr = 1;
+      Serial.println(bank_nr);
+      display.clearDisplay();
+      display.setTextSize(2);
+      display.setTextColor(SH110X_WHITE);
+      display.setCursor(25, 0);
+      display.println("Bank nr");
+      display.setTextSize(3);
+      display.setCursor(55, 30);
+      display.println(bank_nr);
+      display.display();
+      fetchStationsFromServer();
+      changeStation();
+      timeDisplay = true;
     }
   }
 
   // Obsługa przycisku S4
   if (button_4)
   {
-    if ((millis() - lastDebounceTime_S4) > debounceDelay)
+    licznik_S4 = 0;
+    button_4 = mp3 = aac = flac = false;
+    Serial.println("Przycisk S4 został wciśnięty");
+    if (currentOption == INTERNET_RADIO)
     {
-      licznik_S4 = 0;
-      lastDebounceTime_S4 = millis();
-      button_4 = mp3 = aac = flac = false;
-      Serial.println("Przycisk S4 został wciśnięty");
-      if (currentOption == INTERNET_RADIO)
+      timeDisplay = false;
+      currentSelection = 0;
+      firstVisibleLine = 0;
+      bank_nr--;
+      if (bank_nr < 1)
       {
-        currentSelection = 0;
-        firstVisibleLine = 0;
-        bank_nr--;
-        if (bank_nr < 1)
-        {
-          bank_nr = 1;
-        }
-        station_nr = 1;
-        Serial.println(bank_nr);
-        display.clearDisplay();
-        display.setTextSize(2);
-        display.setTextColor(SH110X_WHITE);
-        display.setCursor(25, 0);
-        display.println("Bank nr");
-        display.setTextSize(3);
-        display.setCursor(55, 30);
-        display.println(bank_nr);
-        display.display();
-        fetchStationsFromServer();
-        changeStation();
+        bank_nr = 1;
       }
+      station_nr = 1;
+      Serial.println(bank_nr);
+      display.clearDisplay();
+      display.setTextSize(2);
+      display.setTextColor(SH110X_WHITE);
+      display.setCursor(25, 0);
+      display.println("Bank nr");
+      display.setTextSize(3);
+      display.setCursor(55, 30);
+      display.println(bank_nr);
+      display.display();
+      fetchStationsFromServer();
+      changeStation();
+      timeDisplay = true;
     }
   }
 }
