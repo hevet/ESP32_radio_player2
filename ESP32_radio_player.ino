@@ -1696,7 +1696,7 @@ void loop()
         case BANK_LIST:
           if (DT_state1 == HIGH)
           {
-            
+            currentOption = INTERNET_RADIO;
           }
           else
           {
