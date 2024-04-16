@@ -12,6 +12,86 @@
 #include <Ticker.h>               // Mechanizm tickera (do odświeżania)
 #include <WiFiManager.h>          // https://github.com/tzapu/WiFiManager
 
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+#include <Update.h>
+
+const char* host = "wifi_radio";
+
+WebServer server(80);
+
+/* Style */
+String style =
+"<style>#file-input,input{width:100%;height:44px;border-radius:4px;margin:10px auto;font-size:15px}"
+"input{background:#f1f1f1;border:0;padding:0 15px}body{background:#3498db;font-family:sans-serif;font-size:14px;color:#777}"
+"#file-input{padding:0;border:1px solid #ddd;line-height:44px;text-align:left;display:block;cursor:pointer}"
+"#bar,#prgbar{background-color:#f1f1f1;border-radius:10px}#bar{background-color:#3498db;width:0%;height:10px}"
+"form{background:#fff;max-width:258px;margin:75px auto;padding:30px;border-radius:5px;text-align:center}"
+".btn{background:#3498db;color:#fff;cursor:pointer}</style>";
+
+/* Login page */
+String loginIndex = 
+"<form name=loginForm>"
+"<h1>ESP32 Login</h1>"
+"<input name=userid placeholder='User ID'> "
+"<input name=pwd placeholder=Password type=Password> "
+"<input type=submit onclick=check(this.form) class=btn value=Login></form>"
+"<script>"
+"function check(form) {"
+"if(form.userid.value=='admin' && form.pwd.value=='admin')"
+"{window.open('/serverIndex')}"
+"else"
+"{alert('Error Password or Username')}"
+"}"
+"</script>" + style;
+ 
+/* Server Index Page */
+String serverIndex = 
+"<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
+"<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
+"<input type='file' name='update' id='file' onchange='sub(this)' style=display:none>"
+"<label id='file-input' for='file'>   Choose file...</label>"
+"<input type='submit' class=btn value='Update'>"
+"<br><br>"
+"<div id='prg'></div>"
+"<br><div id='prgbar'><div id='bar'></div></div><br></form>"
+"<script>"
+"function sub(obj){"
+"var fileName = obj.value.split('\\\\');"
+"document.getElementById('file-input').innerHTML = '   '+ fileName[fileName.length-1];"
+"};"
+"$('form').submit(function(e){"
+"e.preventDefault();"
+"var form = $('#upload_form')[0];"
+"var data = new FormData(form);"
+"$.ajax({"
+"url: '/update',"
+"type: 'POST',"
+"data: data,"
+"contentType: false,"
+"processData:false,"
+"xhr: function() {"
+"var xhr = new window.XMLHttpRequest();"
+"xhr.upload.addEventListener('progress', function(evt) {"
+"if (evt.lengthComputable) {"
+"var per = evt.loaded / evt.total;"
+"$('#prg').html('progress: ' + Math.round(per*100) + '%');"
+"$('#bar').css('width',Math.round(per*100) + '%');"
+"}"
+"}, false);"
+"return xhr;"
+"},"
+"success:function(d, s) {"
+"console.log('success!') "
+"},"
+"error: function (a, b, c) {"
+"}"
+"});"
+"});"
+"</script>" + style;
+
 #define SD_CS         47          // Pin CS (Chip Select) do komunikacji z kartą SD, wybierany jako interfejs SPI
 #define SPI_MOSI      48          // Pin MOSI (Master Out Slave In) dla interfejsu SPI
 #define SPI_MISO      0           // Pin MISO (Master In Slave Out) dla interfejsu SPI
@@ -293,6 +373,26 @@ void changeStation()
   display.println(stationName);
   display.display();
 
+  /*Serial.print("Wartość station_nr przed zapisem: ");
+  Serial.println(station_nr);
+  Serial.print("Wartość bank_nr przed zapisem: ");
+  Serial.println(bank_nr);
+  // Zapisz zmienne do pamięci EEPROM pod adresami
+  EEPROM.put(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 2), station_nr);
+  EEPROM.put(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 4), bank_nr);
+  // Oczekiwanie na zakończenie zapisu
+  EEPROM.commit();
+  // Odczytaj dane z pamięci EEPROM
+  EEPROM.get(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 2), station_nr);
+  EEPROM.get(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 4), bank_nr);
+    
+  // Wyświetl odczytane wartości na Serial Monitorze
+  Serial.print("Odczytana wartość station_nr po zapisie: ");
+  Serial.println(station_nr);
+  Serial.print("Odczytana wartość bank_nr po zapisie: ");
+  Serial.println(bank_nr);*/
+
+
   // Połącz z daną stacją
   audio.connecttohost(station);
   seconds = 0;
@@ -469,9 +569,52 @@ void wifi_setup()
   display.setCursor(20, 35);
   display.println("z Wi-Fi");
   display.display();
-}
-}
+  
+  if (!MDNS.begin(host)) { //http://esp32.local
+    Serial.println("Error setting up MDNS responder!");
+    while (1) {
+      delay(1000);
+    }
+  }
+  Serial.println("mDNS responder started");
+  /*return index page which is stored in serverIndex */
+  server.on("/", HTTP_GET, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", loginIndex);
+  });
+  server.on("/serverIndex", HTTP_GET, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", serverIndex);
+  });
+  /*handling uploading firmware file */
+  server.on("/update", HTTP_POST, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+    ESP.restart();
+  }, []() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+      Serial.printf("Update: %s\n", upload.filename.c_str());
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+      /* flashing firmware to ESP*/
+      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_END) {
+      if (Update.end(true)) { //true to set the size to the current progress
+        Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+      } else {
+        Update.printError(Serial);
+      }
+    }
+  });
+  server.begin();
 
+}
+}
 void audio_info(const char *info)
 {
   // Wyświetl informacje w konsoli szeregowej
@@ -1432,6 +1575,7 @@ void updateTimer()  // Wywoływana co sekundę przez timer
 
 void setup()
 {
+  
   // Ustaw pin CS dla karty SD jako wyjście i ustaw go na wysoki stan
   pinMode(SD_CS, OUTPUT);
   digitalWrite(SD_CS, HIGH);
@@ -1473,7 +1617,7 @@ void setup()
   Serial.begin(115200);
 
   // Inicjalizuj pamięć EEPROM z odpowiednim rozmiarem
-  EEPROM.begin(MAX_STATIONS * (MAX_LINK_LENGTH + 1));
+  EEPROM.begin((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 8);
 
   // Oczekaj 250 milisekund na włączenie się wyświetlacza OLED
   delay(250);
@@ -1492,6 +1636,16 @@ void setup()
   wifi_setup();
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   timer.attach(1, updateTimer);   // Ustaw timer, aby wywoływał funkcję updateTimer co sekundę
+  
+  /*
+  EEPROM.get(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 2), station_nr);
+  EEPROM.get(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 4), bank_nr);
+  // Wyświetl odczytane wartości na Serial Monitorze
+  Serial.print("Odczytana wartość station_nr przy rozruchu: ");
+  Serial.println(station_nr);
+  Serial.print("Odczytana wartość bank_nr przy rozruchu: ");
+  Serial.println(bank_nr);*/
+
   fetchStationsFromServer();
   changeStation();
   audio.setTone(gainLowPass, gainBandPass, gainHighPass);
@@ -1502,6 +1656,9 @@ void loop()
   audio.loop();
   button1.loop();
   button2.loop();
+
+  server.handleClient();
+  delay(1);
   
   CLK_state1 = digitalRead(CLK_PIN1);
   if (CLK_state1 != prev_CLK_state1 && CLK_state1 == HIGH)
