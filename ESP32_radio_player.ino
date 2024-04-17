@@ -108,7 +108,7 @@ String serverIndex =
 #define SW_PIN1  4                // Podłączenie z pinu 4 do SW na enkoderze prawym (przycisk)
 #define CLK_PIN2 10               // Podłączenie z pinu 10 do CLK na enkoderze
 #define DT_PIN2  11               // Podłączenie z pinu 11 do DT na enkoderze lewym
-#define SW_PIN2  1                // Podłączenie z pinu 1 do SW na enkoderze lewym (przycisk)
+#define SW_PIN2  46               // Podłączenie z pinu 1 do SW na enkoderze lewym (przycisk)
 #define MAX_STATIONS 100          // Maksymalna liczba stacji radiowych, które mogą być przechowywane w jednym banku
 #define MAX_LINK_LENGTH 100       // Maksymalna długość linku do stacji radiowej.
 #define STATIONS_URL    "https://raw.githubusercontent.com/hevet/ESP32_stream2/main/ulubione"    // Adres URL do pliku z listą stacji radiowych.
@@ -1624,6 +1624,7 @@ void setup()
 
   // Inicjalizuj wyświetlacz OLED z podanym adresem I2C
   display.begin(i2c_Address, true);
+  display.setContrast (5);
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
