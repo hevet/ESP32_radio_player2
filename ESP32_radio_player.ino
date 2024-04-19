@@ -1,6 +1,5 @@
 
 #include "Arduino.h"              // Standardowy nagłówek Arduino, który dostarcza podstawowe funkcje i definicje
-//#include "WiFiMulti.h"            // Biblioteka do obsługi wielu połączeń WiFi
 #include "Audio.h"                // Biblioteka do obsługi funkcji związanych z dźwiękiem i audio
 #include "SPI.h"                  // Biblioteka do obsługi komunikacji SPI
 #include "SD.h"                   // Biblioteka do obsługi kart SD
@@ -10,7 +9,7 @@
 #include <HTTPClient.h>           // Biblioteka do wykonywania żądań HTTP
 #include <EEPROM.h>               // Biblioteka do obsługi pamięci EEPROM
 #include <Ticker.h>               // Mechanizm tickera (do odświeżania)
-#include <WiFiManager.h>          // https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>          // Biblioteka do zarządzania konfiguracją sieci WiFi
 
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -179,6 +178,7 @@ bool noID3data = false;           // Flaga określająca, czy plik audio posiada
 bool timeDisplay = true;          // Flaga określająca kiedy pokazać czas na wyświetlaczu, domyślnie od razu po starcie
 bool listedStations = false;      // Flaga określająca czy na ekranie jest pokazana lista stacji do wyboru
 bool menuEnable = false;          // Flaga określająca czy na ekranie można wyświetlić menu
+//bool enterWiFiPassword = false;   // Flaga określająca czy na ekranie można wpisać hasło sieci
 unsigned long lastDebounceTime_S1 = 0;    // Czas ostatniego debouncingu dla przycisku S1.
 unsigned long lastDebounceTime_S2 = 0;    // Czas ostatniego debouncingu dla przycisku S2.
 unsigned long lastDebounceTime_S3 = 0;    // Czas ostatniego debouncingu dla przycisku S3.
@@ -198,13 +198,13 @@ String bitsPerSampleString;               // Zmienna przechowująca informację 
 String artistString;                      // Zmienna przechowująca informację o wykonawcy
 String titleString;                       // Zmienna przechowująca informację o tytule utworu
 String fileNameString;                    // Zmienna przechowująca informację o nazwie pliku
+String ssidName;
 
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);    //Inicjalizacja obiektu wyświetlacza OLED
 ezButton button1(SW_PIN1);                // Utworzenie obiektu przycisku z enkodera 1 ezButton, podłączonego do pinu 4
 ezButton button2(SW_PIN2);                // Utworzenie obiektu przycisku z enkodera 1 ezButton, podłączonego do pinu 1
 Audio audio;                              // Obiekt do obsługi funkcji związanych z dźwiękiem i audio
 Ticker timer;                             // Obiekt do obsługi timera
-
 char stations[MAX_STATIONS][MAX_LINK_LENGTH + 1];   // Tablica przechowująca linki do stacji radiowych (jedna na stację) +1 dla terminatora null
 
 const char* ntpServer = "pool.ntp.org";      // Adres serwera NTP używany do synchronizacji czasu
@@ -216,7 +216,6 @@ enum MenuOption
   PLAY_FILES,          // Odtwarzacz plików
   INTERNET_RADIO,      // Radio internetowe
   BANK_LIST,           // Lista banków stacji radiowych
-  //WIFI_LIST            // Wybór sieci wifi
 };
 MenuOption currentOption = INTERNET_RADIO;  // Aktualnie wybrana opcja menu (domyślnie radio internetowe)
 
@@ -514,82 +513,6 @@ void sanitizeAndSaveStation(const char* station)
   saveStationToEEPROM(sanitizedStation);
 }
 
-void wifi_setup()
-{
-  // Inicjalizacja WiFiManagera
-  WiFiManager wifiManager;
-
-  if (wifiManager.autoConnect("WIFI_RADIO"))
-  {
-    Serial.println("Połączono z siecią WiFi");
-   display.clearDisplay();
-   display.setTextSize(2);
-   display.setTextColor(SH110X_WHITE);
-   display.setCursor(5, 5);
-   display.println("Polaczono");
-   display.setTextSize(2);
-   display.setCursor(20, 35);
-   display.println("z Wi-Fi");
-   display.display();
-  } 
-  else
-  {
-    Serial.println("Brak połączenia z siecią WiFi");
-    display.clearDisplay();
-    display.setTextSize(2);
-    display.setTextColor(SH110X_WHITE);
-    display.setCursor(35, 5);
-    display.println("Wi-Fi");
-    display.setCursor(40, 25);
-    display.println("nie");
-    display.setCursor(5, 45);
-    display.println("polaczone");
-    display.display();
-  }
-  
-  if (!MDNS.begin(host)) { //http://esp32.local
-    Serial.println("Error setting up MDNS responder!");
-    while (1) {
-      delay(1000);
-    }
-  }
-  Serial.println("mDNS responder started");
-  /*return index page which is stored in serverIndex */
-  server.on("/", HTTP_GET, []() {
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/html", loginIndex);
-  });
-  server.on("/serverIndex", HTTP_GET, []() {
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/html", serverIndex);
-  });
-  /*handling uploading firmware file */
-  server.on("/update", HTTP_POST, []() {
-    server.sendHeader("Connection", "close");
-    server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-    ESP.restart();
-  }, []() {
-    HTTPUpload& upload = server.upload();
-    if (upload.status == UPLOAD_FILE_START) {
-      Serial.printf("Update: %s\n", upload.filename.c_str());
-      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
-        Update.printError(Serial);
-      }
-    } else if (upload.status == UPLOAD_FILE_WRITE) {
-      /* flashing firmware to ESP*/
-      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-        Update.printError(Serial);
-      }
-    } else if (upload.status == UPLOAD_FILE_END) {
-      if (Update.end(true)) { //true to set the size to the current progress
-        Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-      } else {
-        Update.printError(Serial);
-      }
-    }
-  });
-  server.begin();
-}
 
 void audio_info(const char *info)
 {
@@ -952,25 +875,16 @@ void displayMenu()
   {
     case PLAY_FILES:
       display.println(">> Odtwarzacz plik" + String((char)0x0F) + "w");
-      //display.println("   Lista sieci WiFi ");
       display.println("   Radio internetowe");
       display.println("   Lista bank"  + String((char)0x0F) + "w");
       break;
-    //case WIFI_LIST:
-      //display.println("   Odtwarzacz plik" + String((char)0x0F) + "w");
-      //display.println(">> Lista sieci WiFi ");
-      //display.println("   Radio internetowe");
-      //display.println("   Lista bank"  + String((char)0x0F) + "w");
-      //break;
     case INTERNET_RADIO:
       display.println("   Odtwarzacz plik" + String((char)0x0F) + "w");
-      //display.println("   Lista sieci WiFi ");
       display.println(">> Radio internetowe");
       display.println("   Lista bank"  + String((char)0x0F) + "w");
       break;
     case BANK_LIST:
       display.println("   Odtwarzacz plik" + String((char)0x0F) + "w");
-      //display.println("   Lista sieci WiFi ");
       display.println("   Radio internetowe");
       display.println(">> Lista bank"  + String((char)0x0F) + "w");
       break;
@@ -1241,7 +1155,7 @@ void playFromSelectedFolder()
       if (fileEnd == true) //Wymuszenie programowego przejścia do odtwarzania następnego pliku
       {
         fileEnd = false;
-        button_1 = true;
+        button_2 = true;
       }
 
       CLK_state1 = digitalRead(CLK_PIN1);
@@ -1593,14 +1507,14 @@ void setup()
   Serial.begin(115200);
 
   // Inicjalizuj pamięć EEPROM z odpowiednim rozmiarem
-  EEPROM.begin((MAX_STATIONS * (MAX_LINK_LENGTH + 1)));
+  EEPROM.begin((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 8);
 
   // Oczekaj 250 milisekund na włączenie się wyświetlacza OLED
   delay(250);
 
   // Inicjalizuj wyświetlacz OLED z podanym adresem I2C
   display.begin(i2c_Address, true);
-  display.setContrast (100);
+  display.setContrast (5);
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
@@ -1610,7 +1524,83 @@ void setup()
   display.setCursor(35, 35);
   display.println("Radio");
   display.display();
-  wifi_setup();
+
+  // Inicjalizacja WiFiManagera
+  WiFiManager wifiManager;
+
+  // Rozpoczęcie konfiguracji Wi-Fi i połączenie z siecią, jeśli konieczne
+  if (wifiManager.autoConnect("Wifi_Radio"))
+  {
+    Serial.println("Połączono z siecią WiFi");
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(SH110X_WHITE);
+    display.setCursor(5, 5);
+    display.println("Polaczono");
+    display.setTextSize(2);
+    display.setCursor(20, 35);
+    display.println("z Wi-Fi");
+    display.display();
+    
+  }
+  else
+  {
+    Serial.println("Brak połączenia z siecią WiFi");
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(SH110X_WHITE);
+    display.setCursor(35, 5);
+    display.println("Brak");
+    display.setCursor(5, 25);
+    display.println("polaczenia");
+    display.setCursor(20, 45);
+    display.println("z Wi-fi");
+    display.display();
+  }
+
+  if (!MDNS.begin(host)) { //http://esp32.local
+    Serial.println("Error setting up MDNS responder!");
+    while (1) {
+      delay(1000);
+    }
+  }
+  Serial.println("mDNS responder started");
+  /*return index page which is stored in serverIndex */
+  server.on("/", HTTP_GET, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", loginIndex);
+  });
+  server.on("/serverIndex", HTTP_GET, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/html", serverIndex);
+  });
+  /*handling uploading firmware file */
+  server.on("/update", HTTP_POST, []() {
+    server.sendHeader("Connection", "close");
+    server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
+    ESP.restart();
+  }, []() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+      Serial.printf("Update: %s\n", upload.filename.c_str());
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+      /* flashing firmware to ESP*/
+      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+        Update.printError(Serial);
+      }
+    } else if (upload.status == UPLOAD_FILE_END) {
+      if (Update.end(true)) { //true to set the size to the current progress
+        Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
+      } else {
+        Update.printError(Serial);
+      }
+    }
+  });
+  server.begin();
+
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   timer.attach(1, updateTimer);   // Ustaw timer, aby wywoływał funkcję updateTimer co sekundę
 
@@ -1671,6 +1661,17 @@ void loop()
             currentOption = PLAY_FILES;
           }
           break;
+          
+        //case WIFI_LIST:
+          //if (DT_state1 == HIGH)
+          //{
+            //currentOption = PLAY_FILES;
+          //}
+          //else
+          //{
+            //currentOption = INTERNET_RADIO;
+          //}
+          //break;
       }
       displayMenu();
     }
@@ -1726,7 +1727,7 @@ void loop()
         {
           station_nr = 1;
         }
-        Serial.print("Numer stacji do tyłu: ");
+        Serial.print("Numer stacji: ");
         Serial.println(station_nr);
         scrollUp();
         printStationsToOLED();
@@ -1738,7 +1739,7 @@ void loop()
         {
           station_nr = stationsCount;
         }
-        Serial.print("Numer stacji do przodu: ");
+        Serial.print("Numer stacji: ");
         Serial.println(station_nr);
         scrollDown();
         printStationsToOLED();
