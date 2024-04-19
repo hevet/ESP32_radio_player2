@@ -160,9 +160,7 @@ int stationsCount = 0;            // Aktualna liczba przechowywanych stacji w ta
 int directoryCount = 0;           // Licznik katalogów
 int fileIndex = 0;                // Numer aktualnie wybranego pliku audio ze wskazanego folderu
 int folderIndex = 0;              // Numer aktualnie wybranego folderu podczas przełączenia do odtwarzania z karty SD
-//int wifiIndex = 0;                // Numer aktualnie wybranej sieci WiFi z listy
 int totalFilesInFolder = 0;       // Zmienna przechowująca łączną liczbę plików w folderze
-//int numberOfNetworks = 0;         // Liczba znalezionych sieci WiFi
 int volumeValue = 12;             // Wartość głośności, domyślnie ustawiona na 12
 const int maxVisibleLines = 5;    // Maksymalna liczba widocznych linii na ekranie OLED
 bool button_1 = false;            // Flaga określająca stan przycisku 1
@@ -181,7 +179,6 @@ bool noID3data = false;           // Flaga określająca, czy plik audio posiada
 bool timeDisplay = true;          // Flaga określająca kiedy pokazać czas na wyświetlaczu, domyślnie od razu po starcie
 bool listedStations = false;      // Flaga określająca czy na ekranie jest pokazana lista stacji do wyboru
 bool menuEnable = false;          // Flaga określająca czy na ekranie można wyświetlić menu
-//bool enterWiFiPassword = false;   // Flaga określająca czy na ekranie można wpisać hasło sieci
 unsigned long lastDebounceTime_S1 = 0;    // Czas ostatniego debouncingu dla przycisku S1.
 unsigned long lastDebounceTime_S2 = 0;    // Czas ostatniego debouncingu dla przycisku S2.
 unsigned long lastDebounceTime_S3 = 0;    // Czas ostatniego debouncingu dla przycisku S3.
@@ -201,16 +198,13 @@ String bitsPerSampleString;               // Zmienna przechowująca informację 
 String artistString;                      // Zmienna przechowująca informację o wykonawcy
 String titleString;                       // Zmienna przechowująca informację o tytule utworu
 String fileNameString;                    // Zmienna przechowująca informację o nazwie pliku
-String ssidName;
 
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);    //Inicjalizacja obiektu wyświetlacza OLED
 ezButton button1(SW_PIN1);                // Utworzenie obiektu przycisku z enkodera 1 ezButton, podłączonego do pinu 4
 ezButton button2(SW_PIN2);                // Utworzenie obiektu przycisku z enkodera 1 ezButton, podłączonego do pinu 1
 Audio audio;                              // Obiekt do obsługi funkcji związanych z dźwiękiem i audio
-//WiFiMulti wifiMulti;                      // Obiekt do obsługi wielu połączeń WiFi
 Ticker timer;                             // Obiekt do obsługi timera
-//String ssid =     "wifi-A9A0";
-//String password = "juxYEuLu91";
+
 char stations[MAX_STATIONS][MAX_LINK_LENGTH + 1];   // Tablica przechowująca linki do stacji radiowych (jedna na stację) +1 dla terminatora null
 
 const char* ntpServer = "pool.ntp.org";      // Adres serwera NTP używany do synchronizacji czasu
@@ -373,26 +367,6 @@ void changeStation()
   display.println(stationName);
   display.display();
 
-  /*Serial.print("Wartość station_nr przed zapisem: ");
-  Serial.println(station_nr);
-  Serial.print("Wartość bank_nr przed zapisem: ");
-  Serial.println(bank_nr);
-  // Zapisz zmienne do pamięci EEPROM pod adresami
-  EEPROM.put(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 2), station_nr);
-  EEPROM.put(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 4), bank_nr);
-  // Oczekiwanie na zakończenie zapisu
-  EEPROM.commit();
-  // Odczytaj dane z pamięci EEPROM
-  EEPROM.get(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 2), station_nr);
-  EEPROM.get(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 4), bank_nr);
-    
-  // Wyświetl odczytane wartości na Serial Monitorze
-  Serial.print("Odczytana wartość station_nr po zapisie: ");
-  Serial.println(station_nr);
-  Serial.print("Odczytana wartość bank_nr po zapisie: ");
-  Serial.println(bank_nr);*/
-
-
   // Połącz z daną stacją
   audio.connecttohost(station);
   seconds = 0;
@@ -542,33 +516,36 @@ void sanitizeAndSaveStation(const char* station)
 
 void wifi_setup()
 {
-  //WiFi.mode(WIFI_STA);  // Ustaw tryb WiFi na klienta (WIFI_STA)
-  //wifiMulti.addAP(ssid.c_str(), password.c_str());  // Dodaj dostęp do punktu dostępowego (AP) z zadanymi danymi (SSID i hasło)
-  //wifiMulti.run();  // Uruchom konfigurację wielokrotnego dostępu WiFi
-  //if(WiFi.status() != WL_CONNECTED) // Sprawdź, czy udało się połączyć z którąś z dostępnych sieci
-  //{
-  //  WiFi.disconnect(true);  // Jeśli nie, rozłącz WiFi, ponownie uruchom konfigurację wielokrotnego dostępu i spróbuj ponownie
-  //  wifiMulti.run();
-  //}
-  WiFiManager wm;
-  bool res;
-  res = wm.autoConnect("WIFI_RADIO"); // anonymous ap
+  // Inicjalizacja WiFiManagera
+  WiFiManager wifiManager;
 
-  if(!res) {
-    Serial.println("Failed to connect");
-        // ESP.restart();
-    } 
-    else{
-  Serial.println("Połączono z siecią WiFi");
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(SH110X_WHITE);
-  display.setCursor(5, 5);
-  display.println("Polaczono");
-  display.setTextSize(2);
-  display.setCursor(20, 35);
-  display.println("z Wi-Fi");
-  display.display();
+  if (wifiManager.autoConnect("WIFI_RADIO"))
+  {
+    Serial.println("Połączono z siecią WiFi");
+   display.clearDisplay();
+   display.setTextSize(2);
+   display.setTextColor(SH110X_WHITE);
+   display.setCursor(5, 5);
+   display.println("Polaczono");
+   display.setTextSize(2);
+   display.setCursor(20, 35);
+   display.println("z Wi-Fi");
+   display.display();
+  } 
+  else
+  {
+    Serial.println("Brak połączenia z siecią WiFi");
+    display.clearDisplay();
+    display.setTextSize(2);
+    display.setTextColor(SH110X_WHITE);
+    display.setCursor(35, 5);
+    display.println("Wi-Fi");
+    display.setCursor(40, 25);
+    display.println("nie");
+    display.setCursor(5, 45);
+    display.println("polaczone");
+    display.display();
+  }
   
   if (!MDNS.begin(host)) { //http://esp32.local
     Serial.println("Error setting up MDNS responder!");
@@ -612,9 +589,8 @@ void wifi_setup()
     }
   });
   server.begin();
+}
 
-}
-}
 void audio_info(const char *info)
 {
   // Wyświetl informacje w konsoli szeregowej
@@ -1265,7 +1241,7 @@ void playFromSelectedFolder()
       if (fileEnd == true) //Wymuszenie programowego przejścia do odtwarzania następnego pliku
       {
         fileEnd = false;
-        button_2 = true;
+        button_1 = true;
       }
 
       CLK_state1 = digitalRead(CLK_PIN1);
@@ -1617,14 +1593,14 @@ void setup()
   Serial.begin(115200);
 
   // Inicjalizuj pamięć EEPROM z odpowiednim rozmiarem
-  EEPROM.begin((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 8);
+  EEPROM.begin((MAX_STATIONS * (MAX_LINK_LENGTH + 1)));
 
   // Oczekaj 250 milisekund na włączenie się wyświetlacza OLED
   delay(250);
 
   // Inicjalizuj wyświetlacz OLED z podanym adresem I2C
   display.begin(i2c_Address, true);
-  display.setContrast (5);
+  display.setContrast (100);
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
@@ -1637,15 +1613,6 @@ void setup()
   wifi_setup();
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   timer.attach(1, updateTimer);   // Ustaw timer, aby wywoływał funkcję updateTimer co sekundę
-  
-  /*
-  EEPROM.get(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 2), station_nr);
-  EEPROM.get(((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 4), bank_nr);
-  // Wyświetl odczytane wartości na Serial Monitorze
-  Serial.print("Odczytana wartość station_nr przy rozruchu: ");
-  Serial.println(station_nr);
-  Serial.print("Odczytana wartość bank_nr przy rozruchu: ");
-  Serial.println(bank_nr);*/
 
   fetchStationsFromServer();
   changeStation();
@@ -1704,17 +1671,6 @@ void loop()
             currentOption = PLAY_FILES;
           }
           break;
-          
-        //case WIFI_LIST:
-          //if (DT_state1 == HIGH)
-          //{
-            //currentOption = PLAY_FILES;
-          //}
-          //else
-          //{
-            //currentOption = INTERNET_RADIO;
-          //}
-          //break;
       }
       displayMenu();
     }
@@ -1770,7 +1726,7 @@ void loop()
         {
           station_nr = 1;
         }
-        Serial.print("Numer stacji: ");
+        Serial.print("Numer stacji do tyłu: ");
         Serial.println(station_nr);
         scrollUp();
         printStationsToOLED();
@@ -1782,7 +1738,7 @@ void loop()
         {
           station_nr = stationsCount;
         }
-        Serial.print("Numer stacji: ");
+        Serial.print("Numer stacji do przodu: ");
         Serial.println(station_nr);
         scrollDown();
         printStationsToOLED();
