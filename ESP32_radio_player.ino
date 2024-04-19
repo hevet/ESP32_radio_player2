@@ -178,7 +178,6 @@ bool noID3data = false;           // Flaga określająca, czy plik audio posiada
 bool timeDisplay = true;          // Flaga określająca kiedy pokazać czas na wyświetlaczu, domyślnie od razu po starcie
 bool listedStations = false;      // Flaga określająca czy na ekranie jest pokazana lista stacji do wyboru
 bool menuEnable = false;          // Flaga określająca czy na ekranie można wyświetlić menu
-//bool enterWiFiPassword = false;   // Flaga określająca czy na ekranie można wpisać hasło sieci
 unsigned long lastDebounceTime_S1 = 0;    // Czas ostatniego debouncingu dla przycisku S1.
 unsigned long lastDebounceTime_S2 = 0;    // Czas ostatniego debouncingu dla przycisku S2.
 unsigned long lastDebounceTime_S3 = 0;    // Czas ostatniego debouncingu dla przycisku S3.
@@ -198,7 +197,6 @@ String bitsPerSampleString;               // Zmienna przechowująca informację 
 String artistString;                      // Zmienna przechowująca informację o wykonawcy
 String titleString;                       // Zmienna przechowująca informację o tytule utworu
 String fileNameString;                    // Zmienna przechowująca informację o nazwie pliku
-String ssidName;
 
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);    //Inicjalizacja obiektu wyświetlacza OLED
 ezButton button1(SW_PIN1);                // Utworzenie obiektu przycisku z enkodera 1 ezButton, podłączonego do pinu 4
