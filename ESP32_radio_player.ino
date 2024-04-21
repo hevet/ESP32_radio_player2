@@ -42,10 +42,6 @@ HTTPUpdateServer httpUpdater;
 #define MAX_STATIONS 100          // Maksymalna liczba stacji radiowych, które mogą być przechowywane w jednym banku
 #define MAX_LINK_LENGTH 100       // Maksymalna długość linku do stacji radiowej.
 
-int gainLowPass = -3;
-int gainBandPass = 0;
-int gainHighPass = 9;
-
 #define STATIONS_URL    "https://raw.githubusercontent.com/hevet/ESP32_stream2/main/ulubione"     // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL1   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista1"      // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL2   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista2"      // Adres URL do pliku z listą stacji radiowych.
@@ -67,6 +63,10 @@ int gainHighPass = 9;
 #define LICZNIK_S3 15             // Numer pinu dla enkodera/licznika S3
 #define LICZNIK_S4 16             // Numer pinu dla enkodera/licznika S4
 #define MAX_FILES 100             // Maksymalna liczba plików lub katalogów w tablicy directories
+
+int gainLowPass = -3;
+int gainBandPass = 0;
+int gainHighPass = 9;
 
 int currentSelection = 0;         // Numer aktualnego wyboru na ekranie OLED
 int firstVisibleLine = 0;         // Numer pierwszej widocznej linii na ekranie OLED
@@ -108,7 +108,7 @@ bool listedStations = false;      // Flaga określająca czy na ekranie jest pok
 bool menuEnable = false;          // Flaga określająca czy na ekranie można wyświetlić menu
 unsigned long lastDebounceTime = 0;       // Czas ostatniego debouncingu
 unsigned long debounceDelay = 200;        // Czas trwania debouncingu w milisekundach
-unsigned long displayTimeout = 6000;      // Czas wyświetlania komunikatu na ekranie w milisekundach
+unsigned long displayTimeout = 3000;      // Czas wyświetlania komunikatu na ekranie w milisekundach
 unsigned long displayStartTime = 0;       // Czas rozpoczęcia wyświetlania komunikatu
 unsigned long seconds = 0;                // Licznik sekund timera
 
@@ -1577,7 +1577,7 @@ void setup()
   // Inicjalizacja WiFiManagera
   WiFiManager wifiManager;
 
-  // Rozpoczęcie konfiguracji Wi-Fi i połączenie z siecią, jeśli konieczn
+  // Rozpoczęcie konfiguracji Wi-Fi i połączenie z siecią, jeśli konieczne
   if (wifiManager.autoConnect("Wifi_Radio"))
   {
     Serial.println("Połączono z siecią WiFi");
