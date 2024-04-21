@@ -22,7 +22,6 @@ const char* host = "wifi_radio";
 WebServer httpServer(80);
 HTTPUpdateServer httpUpdater;
 
-
 #define SD_CS         47          // Pin CS (Chip Select) do komunikacji z kartą SD, wybierany jako interfejs SPI
 #define SPI_MOSI      48          // Pin MOSI (Master Out Slave In) dla interfejsu SPI
 #define SPI_MISO      0           // Pin MISO (Master In Slave Out) dla interfejsu SPI
@@ -39,10 +38,15 @@ HTTPUpdateServer httpUpdater;
 #define SW_PIN1  4                // Podłączenie z pinu 4 do SW na enkoderze prawym (przycisk)
 #define CLK_PIN2 10               // Podłączenie z pinu 10 do CLK na enkoderze
 #define DT_PIN2  11               // Podłączenie z pinu 11 do DT na enkoderze lewym
-#define SW_PIN2  46               // Podłączenie z pinu 46 do SW na enkoderze lewym (przycisk)
+#define SW_PIN2  46                // Podłączenie z pinu 1 do SW na enkoderze lewym (przycisk)
 #define MAX_STATIONS 100          // Maksymalna liczba stacji radiowych, które mogą być przechowywane w jednym banku
 #define MAX_LINK_LENGTH 100       // Maksymalna długość linku do stacji radiowej.
-#define STATIONS_URL    "https://raw.githubusercontent.com/hevet/ESP32_stream2/main/ulubione"    // Adres URL do pliku z listą stacji radiowych.
+
+int gainLowPass = -3;
+int gainBandPass = 0;
+int gainHighPass = 9;
+
+#define STATIONS_URL    "https://raw.githubusercontent.com/hevet/ESP32_stream2/main/ulubione"     // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL1   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista1"      // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL2   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista2"      // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL3   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista3"      // Adres URL do pliku z listą stacji radiowych.
@@ -64,10 +68,6 @@ HTTPUpdateServer httpUpdater;
 #define LICZNIK_S4 16             // Numer pinu dla enkodera/licznika S4
 #define MAX_FILES 100             // Maksymalna liczba plików lub katalogów w tablicy directories
 
-int gainLowPass = -3;
-int gainBandPass = 0;
-int gainHighPass = 9;
-
 int currentSelection = 0;         // Numer aktualnego wyboru na ekranie OLED
 int firstVisibleLine = 0;         // Numer pierwszej widocznej linii na ekranie OLED
 int button_S1 = 17;               // Przycisk S1 podłączony do pinu 17
@@ -82,10 +82,7 @@ int CLK_state1;                   // Aktualny stan CLK enkodera prawego
 int prev_CLK_state1;              // Poprzedni stan CLK enkodera prawego    
 int CLK_state2;                   // Aktualny stan CLK enkodera lewego
 int prev_CLK_state2;              // Poprzedni stan CLK enkodera lewego          
-int licznik_S1 = 0;               // Licznik dla przycisku S1
-int licznik_S2 = 0;               // Licznik dla przycisku S2
-int licznik_S3 = 0;               // Licznik dla przycisku S3
-int licznik_S4 = 0;               // Licznik dla przycisku S4
+int counter = 0;                  // Licznik dla przycisków
 int stationsCount = 0;            // Aktualna liczba przechowywanych stacji w tablicy
 int directoryCount = 0;           // Licznik katalogów
 int fileIndex = 0;                // Numer aktualnie wybranego pliku audio ze wskazanego folderu
@@ -109,19 +106,16 @@ bool noID3data = false;           // Flaga określająca, czy plik audio posiada
 bool timeDisplay = true;          // Flaga określająca kiedy pokazać czas na wyświetlaczu, domyślnie od razu po starcie
 bool listedStations = false;      // Flaga określająca czy na ekranie jest pokazana lista stacji do wyboru
 bool menuEnable = false;          // Flaga określająca czy na ekranie można wyświetlić menu
-unsigned long lastDebounceTime_S1 = 0;    // Czas ostatniego debouncingu dla przycisku S1.
-unsigned long lastDebounceTime_S2 = 0;    // Czas ostatniego debouncingu dla przycisku S2.
-unsigned long lastDebounceTime_S3 = 0;    // Czas ostatniego debouncingu dla przycisku S3.
-unsigned long lastDebounceTime_S4 = 0;    // Czas ostatniego debouncingu dla przycisku S4.
-unsigned long debounceDelay = 200;        // Czas trwania debouncingu w milisekundach.
-unsigned long displayTimeout = 3000;      // Czas wyświetlania komunikatu na ekranie w milisekundach.
-unsigned long displayStartTime = 0;       // Czas rozpoczęcia wyświetlania komunikatu.
+unsigned long lastDebounceTime = 0;       // Czas ostatniego debouncingu
+unsigned long debounceDelay = 200;        // Czas trwania debouncingu w milisekundach
+unsigned long displayTimeout = 6000;      // Czas wyświetlania komunikatu na ekranie w milisekundach
+unsigned long displayStartTime = 0;       // Czas rozpoczęcia wyświetlania komunikatu
 unsigned long seconds = 0;                // Licznik sekund timera
 
 String directories[MAX_FILES];            // Tablica z indeksami i ścieżkami katalogów
 String currentDirectory = "/";            // Ścieżka bieżącego katalogu
-String stationName;                       // Nazwa aktualnie wybranej stacji radiowej.
-String stationString;                     // Dodatkowe dane stacji radiowej (jeśli istnieją).
+String stationName;                       // Nazwa aktualnie wybranej stacji radiowej
+String stationString;                     // Dodatkowe dane stacji radiowej (jeśli istnieją)
 String bitrateString;                     // Zmienna przechowująca informację o bitrate
 String sampleRateString;                  // Zmienna przechowująca informację o sample rate
 String bitsPerSampleString;               // Zmienna przechowująca informację o liczbie bitów na próbkę
@@ -129,12 +123,14 @@ String artistString;                      // Zmienna przechowująca informację 
 String titleString;                       // Zmienna przechowująca informację o tytule utworu
 String fileNameString;                    // Zmienna przechowująca informację o nazwie pliku
 
+File myFile; // Uchwyt pliku
 
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);    //Inicjalizacja obiektu wyświetlacza OLED
 ezButton button1(SW_PIN1);                // Utworzenie obiektu przycisku z enkodera 1 ezButton, podłączonego do pinu 4
 ezButton button2(SW_PIN2);                // Utworzenie obiektu przycisku z enkodera 1 ezButton, podłączonego do pinu 1
 Audio audio;                              // Obiekt do obsługi funkcji związanych z dźwiękiem i audio
 Ticker timer;                             // Obiekt do obsługi timera
+
 char stations[MAX_STATIONS][MAX_LINK_LENGTH + 1];   // Tablica przechowująca linki do stacji radiowych (jedna na stację) +1 dla terminatora null
 
 const char* ntpServer = "pool.ntp.org";      // Adres serwera NTP używany do synchronizacji czasu
@@ -157,36 +153,36 @@ bool isAudioFile(const char *filename)
 
 void IRAM_ATTR zlicz_S1() // funkcja obsługi przerwania z przycisku S1
 {  
-  if ((millis() - lastDebounceTime_S1) > debounceDelay)
+  if ((millis() - lastDebounceTime) > debounceDelay)
   {
-    lastDebounceTime_S1 = millis(); // Zapisujemy czas ostatniego debouncingu
+    lastDebounceTime = millis(); // Zapisujemy czas ostatniego debouncingu
     button_1 = true;
   }
 }
 
 void IRAM_ATTR zlicz_S2() // funkcja obsługi przerwania z przycisku S2
 {    
-  if ((millis() - lastDebounceTime_S2) > debounceDelay)
+  if ((millis() - lastDebounceTime) > debounceDelay)
   {
-    lastDebounceTime_S2 = millis(); // Zapisujemy czas ostatniego debouncingu
+    lastDebounceTime = millis(); // Zapisujemy czas ostatniego debouncingu
     button_2 = true;
   }
 }
 
 void IRAM_ATTR zlicz_S3() // funkcja obsługi przerwania z przycisku S3
 {  
-  if ((millis() - lastDebounceTime_S3) > debounceDelay)
+  if ((millis() - lastDebounceTime) > debounceDelay)
   {
-    lastDebounceTime_S3 = millis(); // Zapisujemy czas ostatniego debouncingu
+    lastDebounceTime = millis(); // Zapisujemy czas ostatniego debouncingu
     button_3 = true;
   }
 }
 
 void IRAM_ATTR zlicz_S4() // funkcja obsługi przerwania z przycisku S4
 {    
-  if ((millis() - lastDebounceTime_S4) > debounceDelay)
+  if ((millis() - lastDebounceTime) > debounceDelay)
   {
-    lastDebounceTime_S4 = millis(); // Zapisujemy czas ostatniego debouncingu
+    lastDebounceTime = millis(); // Zapisujemy czas ostatniego debouncingu
     button_4 = true;
   }
 }
@@ -270,7 +266,6 @@ void changeStation()
     station[j] = EEPROM.read((station_nr - 1) * (MAX_LINK_LENGTH + 1) + 1 + j);
   }
 
-
   // Ręczne przycinanie znaków na końcu linku
   int lastValidCharIndex = length - 1;
   while (lastValidCharIndex >= 0 && (station[lastValidCharIndex] < 33 || station[lastValidCharIndex] > 126))
@@ -301,6 +296,7 @@ void changeStation()
   seconds = 0;
   stationFromBuffer = station_nr;
   bankFromBuffer = bank_nr;
+  saveStationOnSD();
 }
 
 void fetchStationsFromServer()
@@ -443,7 +439,6 @@ void sanitizeAndSaveStation(const char* station)
   // Zapisz przetworzoną stację do pamięci EEPROM
   saveStationToEEPROM(sanitizedStation);
 }
-
 
 void audio_info(const char *info)
 {
@@ -957,8 +952,6 @@ int maxSelection()
   return 0; // Zwraca 0, jeśli żaden warunek nie jest spełniony
 }
 
-
-
 void playFromSelectedFolder()
 {
   
@@ -1024,7 +1017,7 @@ void playFromSelectedFolder()
 
       if (button_1) //Przejście do kolejnego pliku w folderze
       {
-        licznik_S1 = 0;
+        counter = 0;
         button_1 = false;
         isPlaying = false;
         audio.stopSong();
@@ -1040,7 +1033,7 @@ void playFromSelectedFolder()
 
       if (button_2) //Przejście do poprzedniego pliku w folderze
       {
-        licznik_S2 = 0;
+        counter = 0;
         button_2 = false;
         audio.stopSong();
         fileIndex--;
@@ -1083,10 +1076,10 @@ void playFromSelectedFolder()
         }
       } 
 
-      if (fileEnd == true)  //Przejście do odtwarzania następnego pliku
+      if (fileEnd == true) // Przejście do odtwarzania następnego pliku
       {
         fileEnd = false;
-        button_2 = true;
+        button_1 = true;
       }
 
       CLK_state1 = digitalRead(CLK_PIN1);
@@ -1138,7 +1131,7 @@ void playFromSelectedFolder()
           {
             folderIndex = 1;
           }
-          Serial.print("Numer folderu: ");
+          Serial.print("Numer folderu do tyłu: ");
           Serial.println(folderIndex);
           scrollUp();
           printFoldersToOLED();
@@ -1150,7 +1143,7 @@ void playFromSelectedFolder()
           {
             folderIndex = directoryCount - 1;
           }
-          Serial.print("Numer folderu: ");
+          Serial.print("Numer folderu przodu: ");
           Serial.println(folderIndex);
           scrollDown();
           printFoldersToOLED();
@@ -1160,7 +1153,7 @@ void playFromSelectedFolder()
       }
       prev_CLK_state2 = CLK_state2;
 
-      if (displayActive && (millis() - displayStartTime >= displayTimeout))   // Przywracanie poprzedniej zawartości ekranu po 5 sekundach
+      if (displayActive && (millis() - displayStartTime >= displayTimeout))   // Przywracanie poprzedniej zawartości ekranu po 6 sekundach
       {
         display.clearDisplay();
         display.setTextSize(1);
@@ -1190,6 +1183,7 @@ void playFromSelectedFolder()
         display.display();
         displayActive = false;
         timeDisplay = true;
+        currentOption == PLAY_FILES;
       }
 
       if (button2.isPressed())
@@ -1216,7 +1210,6 @@ void playFromSelectedFolder()
   }
   root.close();
 }
-
 
 // Funkcja do drukowania folderów na ekranie OLED z uwzględnieniem zaznaczenia
 void printFoldersToOLED()
@@ -1392,11 +1385,138 @@ void updateTimer()  // Wywoływana co sekundę przez timer
   }
 }
 
+void saveStationOnSD()
+{
+  // Sprawdź, czy plik station_nr.txt istnieje
+  if (SD.exists("/station_nr.txt"))
+  {
+    Serial.println("Plik station_nr.txt już istnieje.");
+
+    // Otwórz plik do zapisu i nadpisz aktualną wartość station_nr
+    myFile = SD.open("/station_nr.txt", FILE_WRITE);
+    if (myFile)
+    {
+      myFile.println(station_nr);
+      myFile.close();
+      Serial.println("Aktualizacja station_nr.txt na karcie SD.");
+    }
+    else
+    {
+      Serial.println("Błąd podczas otwierania pliku station_nr.txt.");
+    }
+  }
+  else
+  {
+    Serial.println("Plik station_nr.txt nie istnieje. Tworzenie...");
+
+    // Utwórz plik i zapisz w nim aktualną wartość station_nr
+    myFile = SD.open("/station_nr.txt", FILE_WRITE);
+    if (myFile)
+    {
+      myFile.println(station_nr);
+      myFile.close();
+      Serial.println("Utworzono i zapisano station_nr.txt na karcie SD.");
+    }
+    else
+    {
+      Serial.println("Błąd podczas tworzenia pliku station_nr.txt.");
+    }
+  }
+
+  // Sprawdź, czy plik bank_nr.txt istnieje
+  if (SD.exists("/bank_nr.txt"))
+  {
+    Serial.println("Plik bank_nr.txt już istnieje.");
+
+    // Otwórz plik do zapisu i nadpisz aktualną wartość bank_nr
+    myFile = SD.open("/bank_nr.txt", FILE_WRITE);
+    if (myFile)
+    {
+      myFile.println(bank_nr);
+      myFile.close();
+      Serial.println("Aktualizacja bank_nr.txt na karcie SD.");
+    }
+    else
+    {
+      Serial.println("Błąd podczas otwierania pliku bank_nr.txt.");
+    }
+  }
+  else
+  {
+    Serial.println("Plik bank_nr.txt nie istnieje. Tworzenie...");
+
+    // Utwórz plik i zapisz w nim aktualną wartość bank_nr
+    myFile = SD.open("/bank_nr.txt", FILE_WRITE);
+    if (myFile)
+    {
+      myFile.println(bank_nr);
+      myFile.close();
+      Serial.println("Utworzono i zapisano bank_nr.txt na karcie SD.");
+    }
+    else
+    {
+      Serial.println("Błąd podczas tworzenia pliku bank_nr.txt.");
+    }
+  }
+}
+
+void readStationFromSD()
+{
+  // Sprawdź, czy karta SD jest dostępna
+  if (!SD.begin(47))
+  {
+    Serial.println("Nie można znaleźć karty SD. Ustawiam domyślne wartości.");
+    station_nr = 8;
+    bank_nr = 1;
+    return;
+  }
+
+  // Sprawdź, czy plik station_nr.txt istnieje
+  if (SD.exists("/station_nr.txt"))
+  {
+    myFile = SD.open("station_nr.txt");
+    if (myFile)
+    {
+      station_nr = myFile.parseInt();
+      myFile.close();
+      Serial.print("Wczytano station_nr z karty SD: ");
+      Serial.println(station_nr);
+    }
+    else
+    {
+      Serial.println("Błąd podczas otwierania pliku station_nr.txt.");
+    }
+  }
+  else
+  {
+    Serial.println("Plik station_nr.txt nie istnieje.");
+  }
+
+  // Sprawdź, czy plik bank_nr.txt istnieje
+  if (SD.exists("bank_nr.txt"))
+  {
+    myFile = SD.open("/bank_nr.txt");
+    if (myFile)
+    {
+      bank_nr = myFile.parseInt();
+      myFile.close();
+      Serial.print("Wczytano bank_nr z karty SD: ");
+      Serial.println(bank_nr);
+    }
+    else
+    {
+      Serial.println("Błąd podczas otwierania pliku bank_nr.txt.");
+    }
+  }
+  else
+  {
+    Serial.println("Plik bank_nr.txt nie istnieje.");
+  }
+}
 
 
 void setup()
 {
-  
   // Ustaw pin CS dla karty SD jako wyjście i ustaw go na wysoki stan
   pinMode(SD_CS, OUTPUT);
   digitalWrite(SD_CS, HIGH);
@@ -1406,10 +1526,6 @@ void setup()
   pinMode(DT_PIN1, INPUT);
   pinMode(CLK_PIN2, INPUT);
   pinMode(DT_PIN2, INPUT);
-
-  // Ustaw czas odbicia dla przycisków enkodera na 50 milisekund
-  //button1.setDebounceTime(50);
-  //button2.setDebounceTime(50);
 
   // Odczytaj początkowy stan pinu CLK enkodera
   prev_CLK_state1 = digitalRead(CLK_PIN1);
@@ -1438,14 +1554,14 @@ void setup()
   Serial.begin(115200);
 
   // Inicjalizuj pamięć EEPROM z odpowiednim rozmiarem
-  EEPROM.begin((MAX_STATIONS * (MAX_LINK_LENGTH + 1)) + 8);
+  EEPROM.begin((MAX_STATIONS * (MAX_LINK_LENGTH + 1)));
 
   // Oczekaj 250 milisekund na włączenie się wyświetlacza OLED
   delay(250);
 
   // Inicjalizuj wyświetlacz OLED z podanym adresem I2C
   display.begin(i2c_Address, true);
-  display.setContrast (5);
+  display.setContrast (50);
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
@@ -1456,10 +1572,12 @@ void setup()
   display.println("Radio");
   display.display();
 
+  readStationFromSD();
+
   // Inicjalizacja WiFiManagera
   WiFiManager wifiManager;
 
-  // Rozpoczęcie konfiguracji Wi-Fi i połączenie z siecią, jeśli konieczne
+  // Rozpoczęcie konfiguracji Wi-Fi i połączenie z siecią, jeśli konieczn
   if (wifiManager.autoConnect("Wifi_Radio"))
   {
     Serial.println("Połączono z siecią WiFi");
@@ -1614,7 +1732,7 @@ void loop()
         {
           station_nr = 1;
         }
-        Serial.print("Numer stacji: ");
+        Serial.print("Numer stacji do tyłu: ");
         Serial.println(station_nr);
         scrollUp();
         printStationsToOLED();
@@ -1626,7 +1744,7 @@ void loop()
         {
           station_nr = stationsCount;
         }
-        Serial.print("Numer stacji: ");
+        Serial.print("Numer stacji do przodu: ");
         Serial.println(station_nr);
         scrollDown();
         printStationsToOLED();
@@ -1704,9 +1822,6 @@ void loop()
     currentOption = INTERNET_RADIO;
   }
   
-  
-
-
   if ((currentOption == PLAY_FILES) && (button1.isPressed()) && (menuEnable == true))
   {
     if (!SD.begin(SD_CS))
@@ -1732,8 +1847,6 @@ void loop()
     changeStation();
   }
 
-
-  
   if (button1.isPressed())
   {
     timeDisplay = false;
@@ -1758,14 +1871,11 @@ void loop()
     fetchStationsFromServer();
     changeStation();
   }
-  
-
-
 
   // Obsługa przycisku S1
   if (button_1)
   {
-    licznik_S1 = 0;
+    counter = 0;
     button_1 = mp3 = aac = flac = false;
     Serial.println("Przycisk S1 został wciśnięty");
     if (currentOption == INTERNET_RADIO)
@@ -1783,7 +1893,7 @@ void loop()
   // Obsługa przycisku S2
   if (button_2)
   {
-    licznik_S2 = 0;
+    counter = 0;
     button_2 = mp3 = aac = flac = false;
     Serial.println("Przycisk S2 został wciśnięty");
     if (currentOption == INTERNET_RADIO)
@@ -1801,7 +1911,7 @@ void loop()
   // Obsługa przycisku S3
   if (button_3)
   {
-    licznik_S3 = 0;
+    counter = 0;
     button_3 = mp3 = aac = flac = false;
     Serial.println("Przycisk S3 został wciśnięty");
     if (currentOption == INTERNET_RADIO)
@@ -1834,7 +1944,7 @@ void loop()
   // Obsługa przycisku S4
   if (button_4)
   {
-    licznik_S4 = 0;
+    counter = 0;
     button_4 = mp3 = aac = flac = false;
     Serial.println("Przycisk S4 został wciśnięty");
     if (currentOption == INTERNET_RADIO)
@@ -1864,6 +1974,7 @@ void loop()
     }
   }
 }
+
 
 void handleRoot() {
   httpServer.send(200, "text/plain", "Witaj, milego dnia!");   // Send HTTP status 200 (Ok) and send some text to the browser/client
