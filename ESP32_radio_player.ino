@@ -1499,7 +1499,7 @@ void setup()
   attachInterrupt(LICZNIK_S4, zlicz_S4, RISING);
 
   audio.setPinout(I2S_BCLK, I2S_LRC, I2S_DOUT); // Konfiguruj pinout dla interfejsu I2S audio
-  audio.setVolume(volumeValue); // Ustaw głośność na podstawie wartości zmiennej volumeValue w zakresie 0...21
+  //audio.setVolume(volumeValue); // Ustaw głośność na podstawie wartości zmiennej volumeValue w zakresie 0...21
 
   // Inicjalizuj interfejs SPI dla obsługi wyświetlacza OLED
   SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
@@ -1549,6 +1549,7 @@ void setup()
     timer.attach(1, updateTimer);   // Ustaw timer, aby wywoływał funkcję updateTimer co sekundę
     fetchStationsFromServer();
     changeStation();
+    audio.setVolume(volumeValue);
     audio.setTone(gainLowPass, gainBandPass, gainHighPass);
   }
   else
