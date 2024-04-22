@@ -24,7 +24,7 @@ HTTPUpdateServer httpUpdater;
 
 #define SD_CS         47          // Pin CS (Chip Select) do komunikacji z kartą SD, wybierany jako interfejs SPI
 #define SPI_MOSI      48          // Pin MOSI (Master Out Slave In) dla interfejsu SPI
-#define SPI_MISO      0           // Pin MISO (Master In Slave Out) dla interfejsu SPI
+#define SPI_MISO      38           // Pin MISO (Master In Slave Out) dla interfejsu SPI
 #define SPI_SCK       45          // Pin SCK (Serial Clock) dla interfejsu SPI
 #define I2S_DOUT      13          // połączenie do pinu DIN na DAC
 #define I2S_BCLK      12          // połączenie po pinu BCK na DAC
@@ -41,8 +41,7 @@ HTTPUpdateServer httpUpdater;
 #define SW_PIN2  46                // Podłączenie z pinu 1 do SW na enkoderze lewym (przycisk)
 #define MAX_STATIONS 100          // Maksymalna liczba stacji radiowych, które mogą być przechowywane w jednym banku
 #define MAX_LINK_LENGTH 100       // Maksymalna długość linku do stacji radiowej.
-
-#define STATIONS_URL    "https://raw.githubusercontent.com/hevet/ESP32_stream2/main/ulubione"     // Adres URL do pliku z listą stacji radiowych.
+#define STATIONS_URL    "https://raw.githubusercontent.com/hevet/ESP32_stream2/main/ulubione"    // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL1   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista1"      // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL2   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista2"      // Adres URL do pliku z listą stacji radiowych.
 #define STATIONS_URL3   "https://raw.githubusercontent.com/sarunia/ESP32_stream/main/lista3"      // Adres URL do pliku z listą stacji radiowych.
@@ -74,7 +73,7 @@ int button_S1 = 17;               // Przycisk S1 podłączony do pinu 17
 int button_S2 = 18;               // Przycisk S2 podłączony do pinu 18
 int button_S3 = 15;               // Przycisk S3 podłączony do pinu 15
 int button_S4 = 16;               // Przycisk S4 podłączony do pinu 16
-int station_nr = 8;               // Numer aktualnie wybranej stacji radiowej z listy, domyślnie stacja nr 4
+int station_nr = 9;               // Numer aktualnie wybranej stacji radiowej z listy, domyślnie stacja nr 4
 int stationFromBuffer = 0;        // Numer stacji radiowej przechowywanej w buforze do przywrocenia na ekran po bezczynności
 int bank_nr = 1;                  // Numer aktualnie wybranego banku stacji z listy, domyślnie bank nr 1
 int bankFromBuffer = 0;           // Numer aktualnie wybranego banku stacji z listy do przywrocenia na ekran po bezczynności
@@ -108,7 +107,7 @@ bool listedStations = false;      // Flaga określająca czy na ekranie jest pok
 bool menuEnable = false;          // Flaga określająca czy na ekranie można wyświetlić menu
 unsigned long lastDebounceTime = 0;       // Czas ostatniego debouncingu
 unsigned long debounceDelay = 200;        // Czas trwania debouncingu w milisekundach
-unsigned long displayTimeout = 3000;      // Czas wyświetlania komunikatu na ekranie w milisekundach
+unsigned long displayTimeout = 6000;      // Czas wyświetlania komunikatu na ekranie w milisekundach
 unsigned long displayStartTime = 0;       // Czas rozpoczęcia wyświetlania komunikatu
 unsigned long seconds = 0;                // Licznik sekund timera
 
@@ -1466,7 +1465,7 @@ void readStationFromSD()
   if (!SD.begin(47))
   {
     Serial.println("Nie można znaleźć karty SD. Ustawiam domyślne wartości.");
-    station_nr = 8;
+    station_nr = 9;
     bank_nr = 1;
     return;
   }
@@ -1474,7 +1473,7 @@ void readStationFromSD()
   // Sprawdź, czy plik station_nr.txt istnieje
   if (SD.exists("/station_nr.txt"))
   {
-    myFile = SD.open("station_nr.txt");
+    myFile = SD.open("/station_nr.txt");
     if (myFile)
     {
       station_nr = myFile.parseInt();
@@ -1493,7 +1492,7 @@ void readStationFromSD()
   }
 
   // Sprawdź, czy plik bank_nr.txt istnieje
-  if (SD.exists("bank_nr.txt"))
+  if (SD.exists("/bank_nr.txt"))
   {
     myFile = SD.open("/bank_nr.txt");
     if (myFile)
@@ -1561,7 +1560,6 @@ void setup()
 
   // Inicjalizuj wyświetlacz OLED z podanym adresem I2C
   display.begin(i2c_Address, true);
-  display.setContrast (50);
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
@@ -1571,14 +1569,14 @@ void setup()
   display.setCursor(35, 35);
   display.println("Radio");
   display.display();
-
-  readStationFromSD();
-
+  
   // Inicjalizacja WiFiManagera
   WiFiManager wifiManager;
 
+  readStationFromSD();
+
   // Rozpoczęcie konfiguracji Wi-Fi i połączenie z siecią, jeśli konieczne
-  if (wifiManager.autoConnect("Wifi_Radio"))
+  if (wifiManager.autoConnect("ESP Internet Radio"))
   {
     Serial.println("Połączono z siecią WiFi");
     display.clearDisplay();
@@ -1594,7 +1592,7 @@ void setup()
     timer.attach(1, updateTimer);   // Ustaw timer, aby wywoływał funkcję updateTimer co sekundę
     fetchStationsFromServer();
     changeStation();
-    
+    audio.setTone(gainLowPass, gainBandPass, gainHighPass);
   }
   else
   {
@@ -1611,10 +1609,9 @@ void setup()
     display.display();
   }
 
-    if (MDNS.begin(host)) {
+  if (MDNS.begin(host)) {
     Serial.println("mDNS responder started");
   }
-
   httpUpdater.setup(&httpServer);
   httpServer.on("/", handleRoot);
   httpServer.onNotFound(handleNotFound);
@@ -1622,8 +1619,6 @@ void setup()
 
   MDNS.addService("http", "tcp", 80);
   Serial.printf("HTTPUpdateServer ready! Open http://%s.local/update in your browser\n", host);
-
-  audio.setTone(gainLowPass, gainBandPass, gainHighPass);
 }
 
 void loop()
@@ -1631,8 +1626,6 @@ void loop()
   audio.loop();
   button1.loop();
   button2.loop();
-
-  httpServer.handleClient();
   
   CLK_state1 = digitalRead(CLK_PIN1);
   if (CLK_state1 != prev_CLK_state1 && CLK_state1 == HIGH)
@@ -1973,6 +1966,7 @@ void loop()
       timeDisplay = true;
     }
   }
+  httpServer.handleClient();
 }
 
 
