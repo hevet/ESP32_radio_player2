@@ -24,7 +24,7 @@ HTTPUpdateServer httpUpdater;
 
 #define SD_CS         47          // Pin CS (Chip Select) do komunikacji z kartą SD, wybierany jako interfejs SPI
 #define SPI_MOSI      48          // Pin MOSI (Master Out Slave In) dla interfejsu SPI
-#define SPI_MISO      38           // Pin MISO (Master In Slave Out) dla interfejsu SPI
+#define SPI_MISO       0          // Pin MISO (Master In Slave Out) dla interfejsu SPI
 #define SPI_SCK       45          // Pin SCK (Serial Clock) dla interfejsu SPI
 #define I2S_DOUT      13          // połączenie do pinu DIN na DAC
 #define I2S_BCLK      12          // połączenie po pinu BCK na DAC
@@ -295,7 +295,7 @@ void changeStation()
   seconds = 0;
   stationFromBuffer = station_nr;
   bankFromBuffer = bank_nr;
-  saveStationOnSD();
+  saveSettingsOnSD();
 }
 
 void fetchStationsFromServer()
@@ -1115,6 +1115,7 @@ void playFromSelectedFolder()
         display.setCursor(48, 30);
         display.println(volumeValue);
         display.display();
+        saveSettingsOnSD();
       }
       prev_CLK_state1 = CLK_state1;
 
@@ -1384,82 +1385,35 @@ void updateTimer()  // Wywoływana co sekundę przez timer
   }
 }
 
-void saveStationOnSD()
+void saveSettingsOnSD()
 {
-  // Sprawdź, czy plik station_nr.txt istnieje
-  if (SD.exists("/station_nr.txt"))
+  // Sprawdź, czy karta SD jest dostępna
+  if (!SD.begin(47))
   {
-    Serial.println("Plik station_nr.txt już istnieje.");
+    Serial.println("Nie można znaleźć karty SD. Nie zapisano ustawień.");
+    return;
+  }
 
-    // Otwórz plik do zapisu i nadpisz aktualną wartość station_nr
-    myFile = SD.open("/station_nr.txt", FILE_WRITE);
-    if (myFile)
-    {
-      myFile.println(station_nr);
-      myFile.close();
-      Serial.println("Aktualizacja station_nr.txt na karcie SD.");
-    }
-    else
-    {
-      Serial.println("Błąd podczas otwierania pliku station_nr.txt.");
-    }
+  // Otwórz plik do zapisu
+  File myFile = SD.open("/radio_setting.txt", FILE_WRITE);
+  if (myFile)
+  {
+    // Zapisz wartości station_nr, bank_nr i volumeValue do pliku
+    myFile.print(station_nr);
+    myFile.print(',');
+    myFile.print(bank_nr);
+    myFile.print(',');
+    myFile.println(volumeValue);
+    myFile.close();
+    Serial.println("Zapisano ustawienia w pliku radio_setting.txt na karcie SD.");
   }
   else
   {
-    Serial.println("Plik station_nr.txt nie istnieje. Tworzenie...");
-
-    // Utwórz plik i zapisz w nim aktualną wartość station_nr
-    myFile = SD.open("/station_nr.txt", FILE_WRITE);
-    if (myFile)
-    {
-      myFile.println(station_nr);
-      myFile.close();
-      Serial.println("Utworzono i zapisano station_nr.txt na karcie SD.");
-    }
-    else
-    {
-      Serial.println("Błąd podczas tworzenia pliku station_nr.txt.");
-    }
-  }
-
-  // Sprawdź, czy plik bank_nr.txt istnieje
-  if (SD.exists("/bank_nr.txt"))
-  {
-    Serial.println("Plik bank_nr.txt już istnieje.");
-
-    // Otwórz plik do zapisu i nadpisz aktualną wartość bank_nr
-    myFile = SD.open("/bank_nr.txt", FILE_WRITE);
-    if (myFile)
-    {
-      myFile.println(bank_nr);
-      myFile.close();
-      Serial.println("Aktualizacja bank_nr.txt na karcie SD.");
-    }
-    else
-    {
-      Serial.println("Błąd podczas otwierania pliku bank_nr.txt.");
-    }
-  }
-  else
-  {
-    Serial.println("Plik bank_nr.txt nie istnieje. Tworzenie...");
-
-    // Utwórz plik i zapisz w nim aktualną wartość bank_nr
-    myFile = SD.open("/bank_nr.txt", FILE_WRITE);
-    if (myFile)
-    {
-      myFile.println(bank_nr);
-      myFile.close();
-      Serial.println("Utworzono i zapisano bank_nr.txt na karcie SD.");
-    }
-    else
-    {
-      Serial.println("Błąd podczas tworzenia pliku bank_nr.txt.");
-    }
+    Serial.println("Błąd podczas otwierania pliku radio_setting.txt.");
   }
 }
 
-void readStationFromSD()
+void readSettingsFromSD()
 {
   // Sprawdź, czy karta SD jest dostępna
   if (!SD.begin(47))
@@ -1467,51 +1421,53 @@ void readStationFromSD()
     Serial.println("Nie można znaleźć karty SD. Ustawiam domyślne wartości.");
     station_nr = 8;
     bank_nr = 1;
+    volumeValue = 12;
     return;
   }
 
-  // Sprawdź, czy plik station_nr.txt istnieje
-  if (SD.exists("/station_nr.txt"))
+  // Sprawdź, czy plik radio_setting.txt istnieje
+  if (SD.exists("/radio_setting.txt"))
   {
-    myFile = SD.open("/station_nr.txt");
+    // Otwórz plik do odczytu
+    File myFile = SD.open("/radio_setting.txt");
     if (myFile)
     {
-      station_nr = myFile.parseInt();
+      // Odczytaj wartości ze strumienia pliku
+      String setting = myFile.readStringUntil('\n');
+      int firstCommaIndex = setting.indexOf(',');
+      int secondCommaIndex = setting.indexOf(',', firstCommaIndex + 1);
+      if (firstCommaIndex != -1 && secondCommaIndex != -1)
+      {
+        station_nr = setting.substring(0, firstCommaIndex).toInt();
+        bank_nr = setting.substring(firstCommaIndex + 1, secondCommaIndex).toInt();
+        volumeValue = setting.substring(secondCommaIndex + 1).toInt();
+        Serial.print("Wczytano ustawienia z karty SD: station_nr=");
+        Serial.print(station_nr);
+        Serial.print(", bank_nr=");
+        Serial.print(bank_nr);
+        Serial.print(", volumeValue=");
+        Serial.println(volumeValue);
+      }
+      else
+      {
+        Serial.println("Błąd w formacie pliku radio_setting.txt.");
+      }
       myFile.close();
-      Serial.print("Wczytano station_nr z karty SD: ");
-      Serial.println(station_nr);
     }
     else
     {
-      Serial.println("Błąd podczas otwierania pliku station_nr.txt.");
+      Serial.println("Błąd podczas otwierania pliku radio_setting.txt.");
     }
   }
   else
   {
-    Serial.println("Plik station_nr.txt nie istnieje.");
-  }
-
-  // Sprawdź, czy plik bank_nr.txt istnieje
-  if (SD.exists("/bank_nr.txt"))
-  {
-    myFile = SD.open("/bank_nr.txt");
-    if (myFile)
-    {
-      bank_nr = myFile.parseInt();
-      myFile.close();
-      Serial.print("Wczytano bank_nr z karty SD: ");
-      Serial.println(bank_nr);
-    }
-    else
-    {
-      Serial.println("Błąd podczas otwierania pliku bank_nr.txt.");
-    }
-  }
-  else
-  {
-    Serial.println("Plik bank_nr.txt nie istnieje.");
+    Serial.println("Plik radio_setting.txt nie istnieje. Ustawiam domyślne wartości.");
+    station_nr = 8;
+    bank_nr = 1;
+    volumeValue = 12;
   }
 }
+
 
 
 void setup()
@@ -1574,7 +1530,7 @@ void setup()
   // Inicjalizacja WiFiManagera
   WiFiManager wifiManager;
 
-  readStationFromSD();
+  readSettingsFromSD();
 
   // Rozpoczęcie konfiguracji Wi-Fi i połączenie z siecią, jeśli konieczne
   if (wifiManager.autoConnect("Wifi_Radio"))
@@ -1705,6 +1661,7 @@ void loop()
       display.setCursor(48, 30);
       display.println(volumeValue);
       display.display();
+      saveSettingsOnSD();
     }
   }
   prev_CLK_state1 = CLK_state1;
