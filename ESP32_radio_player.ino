@@ -73,7 +73,7 @@ int button_S1 = 17;               // Przycisk S1 podłączony do pinu 17
 int button_S2 = 18;               // Przycisk S2 podłączony do pinu 18
 int button_S3 = 15;               // Przycisk S3 podłączony do pinu 15
 int button_S4 = 16;               // Przycisk S4 podłączony do pinu 16
-int station_nr = 9;               // Numer aktualnie wybranej stacji radiowej z listy, domyślnie stacja nr 4
+int station_nr = 8;               // Numer aktualnie wybranej stacji radiowej z listy, domyślnie stacja nr 4
 int stationFromBuffer = 0;        // Numer stacji radiowej przechowywanej w buforze do przywrocenia na ekran po bezczynności
 int bank_nr = 1;                  // Numer aktualnie wybranego banku stacji z listy, domyślnie bank nr 1
 int bankFromBuffer = 0;           // Numer aktualnie wybranego banku stacji z listy do przywrocenia na ekran po bezczynności
@@ -107,7 +107,7 @@ bool listedStations = false;      // Flaga określająca czy na ekranie jest pok
 bool menuEnable = false;          // Flaga określająca czy na ekranie można wyświetlić menu
 unsigned long lastDebounceTime = 0;       // Czas ostatniego debouncingu
 unsigned long debounceDelay = 200;        // Czas trwania debouncingu w milisekundach
-unsigned long displayTimeout = 6000;      // Czas wyświetlania komunikatu na ekranie w milisekundach
+unsigned long displayTimeout = 3000;      // Czas wyświetlania komunikatu na ekranie w milisekundach
 unsigned long displayStartTime = 0;       // Czas rozpoczęcia wyświetlania komunikatu
 unsigned long seconds = 0;                // Licznik sekund timera
 
@@ -1465,7 +1465,7 @@ void readStationFromSD()
   if (!SD.begin(47))
   {
     Serial.println("Nie można znaleźć karty SD. Ustawiam domyślne wartości.");
-    station_nr = 9;
+    station_nr = 8;
     bank_nr = 1;
     return;
   }
@@ -1560,6 +1560,7 @@ void setup()
 
   // Inicjalizuj wyświetlacz OLED z podanym adresem I2C
   display.begin(i2c_Address, true);
+  display.setContrast (50);
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(SH110X_WHITE);
@@ -1576,7 +1577,7 @@ void setup()
   readStationFromSD();
 
   // Rozpoczęcie konfiguracji Wi-Fi i połączenie z siecią, jeśli konieczne
-  if (wifiManager.autoConnect("ESP Internet Radio"))
+  if (wifiManager.autoConnect("Wifi_Radio"))
   {
     Serial.println("Połączono z siecią WiFi");
     display.clearDisplay();
