@@ -1529,6 +1529,7 @@ void setup()
   
   // Inicjalizacja WiFiManagera
   WiFiManager wifiManager;
+  wifiManager.setConfigPortalTimeout(30);
 
   readSettingsFromSD();
 
