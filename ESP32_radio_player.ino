@@ -505,70 +505,51 @@ void audio_info(const char *info)
   {
     display.setTextSize(1);
     display.setTextColor(SH110X_WHITE);
-    for (int y = 37; y <= 54; y++)
-    {
-      for (int x = 0; x < 127; x++)
-      {
-        display.drawPixel(x, y, SH110X_BLACK);
-      }
-    }
+
+    // Czyszczenie obszaru ekranu prostokątem
+    display.fillRect(0, 37, 128, 18, SH110X_BLACK);
+
     display.setCursor(0, 37);
     display.println(sampleRateString.substring(1) + "Hz " + bitsPerSampleString + "bit");
     
     display.setCursor(0, 47);
     display.println(bitrateString.substring(1) + "b/s  Bank " + String(bank_nr));
-    for (int y = 56; y <= 63; y++)
-    {
-      for (int x = 51; x < 127; x++)
-      {
-        display.drawPixel(x, y, SH110X_BLACK);
-      }
-    }
+
+    // Czyszczenie obszaru ekranu prostokątem
+    display.fillRect(51, 56, 76, 8, SH110X_BLACK);
+
     display.setCursor(66, 56);
     display.println("Stacja " + String(station_nr));
     display.display();
   }
 
-  if (currentOption == PLAY_FILES)
-  {
-    display.setTextSize(1);
-    display.setTextColor(SH110X_WHITE);
-    if (noID3data == true)
-    {
-      for (int y = 9; y <= 36; y++)
-      {
-        for (int x = 0; x < 127; x++)
-        {
-          display.drawPixel(x, y, SH110X_BLACK);
-        }
-      }
-      display.setCursor(0, 10);
-      display.println(fileNameString);
-    }
-    for (int y = 37; y <= 54; y++)
-    {
-      for (int x = 0; x < 127; x++)
-      {
-        display.drawPixel(x, y, SH110X_BLACK);
-      }
-    }
-    display.setCursor(0, 37);
-    display.println(sampleRateString.substring(1) + "Hz " + bitsPerSampleString + "bit");
-    
-    display.setCursor(0, 47);
-    display.println(bitrateString.substring(1) + "b/s Plik " + String(fileIndex) + "/" + String(totalFilesInFolder));
-    for (int y = 56; y <= 63; y++)
-    {
-      for (int x = 51; x < 127; x++)
-      {
-        display.drawPixel(x, y, SH110X_BLACK);
-      }
-    }
-    display.setCursor(66, 56);
-    display.println("Folder " + String(folderIndex));
-    display.display();
-    seconds = 0;
+  if (currentOption == PLAY_FILES) {
+  display.setTextSize(1);
+  display.setTextColor(SH110X_WHITE);
+
+  if (noID3data) {
+    // Czyszczenie obszaru (0, 9) do (127, 36)
+    display.fillRect(0, 9, 128, 28, SH110X_BLACK);
+    display.setCursor(0, 10);
+    display.println(fileNameString);
   }
+
+  // Czyszczenie obszaru (0, 37) do (127, 54)
+  display.fillRect(0, 37, 128, 18, SH110X_BLACK);
+  display.setCursor(0, 37);
+  display.println(sampleRateString.substring(1) + "Hz " + bitsPerSampleString + "bit");
+
+  display.setCursor(0, 47);
+  display.println(bitrateString.substring(1) + "b/s Plik " + String(fileIndex) + "/" + String(totalFilesInFolder));
+
+  // Czyszczenie obszaru (51, 56) do (127, 63)
+  display.fillRect(51, 56, 76, 8, SH110X_BLACK);
+  display.setCursor(66, 56);
+  display.println("Folder " + String(folderIndex));
+
+  display.display();
+  seconds = 0;
+ }
 }
 
 void processText(String &text)
@@ -752,13 +733,10 @@ void audio_showstreamtitle(const char *info)
 
   display.setTextSize(1);
   display.setTextColor(SH110X_WHITE);
-  for (int y=9; y<=36; y++)
-  {
-    for (int x=0; x<127; x++)
-    {
-    display.drawPixel(x, y, SH110X_BLACK); 
-    }
-  }   
+
+  // Czyszczenie obszaru od (0, 9) do (127, 36)
+  display.fillRect(0, 9, 128, 28, SH110X_BLACK);
+ 
   display.setCursor(0, 10);
   display.println(stationString);
   display.display();
@@ -1251,13 +1229,10 @@ void printFoldersToOLED()
         // Wyświetl wiersz
         display.setCursor(0, displayRow * 9);
         display.print(displayedPath);
-        for (int y = 61; y <= 63; y++) // Wygaszenie 2 ostatnich linii wyświetlacza
-        {
-          for (int x = 0; x < 127; x++)
-          {
-            display.drawPixel(x, y, SH110X_BLACK);
-          }
-        }
+
+        // Czyszczenie dwóch ostatnich linii wyświetlacza (61, 62, 63)
+        display.fillRect(0, 61, 128, 3, SH110X_BLACK);
+
         // Przesuń się do kolejnego wiersza
         displayRow++;
       }
@@ -1309,13 +1284,10 @@ void printStationsToOLED()
     // Dodaj dodatkowy wydruk do diagnostyki
     //Serial.print("Wyświetlona stacja: ");
     //Serial.println(station);
-    for (int y = 61; y <= 63; y++) // Wygaszenie 2 ostatnich linii wyświetlacza
-    {
-      for (int x = 0; x < 127; x++)
-      {
-        display.drawPixel(x, y, SH110X_BLACK);
-      }
-    }
+
+    // Czyszczenie dwóch ostatnich linii wyświetlacza (61, 62, 63)
+    display.fillRect(0, 61, 128, 3, SH110X_BLACK);
+
     // Przesuń się do kolejnego wiersza
     displayRow++;
   }
@@ -1363,13 +1335,10 @@ void updateTimer()  // Wywoływana co sekundę przez timer
     }
 
     display.setCursor(0, 56);
-    for (int y = 56; y <= 63; y++)
-    {
-      for (int x = 0; x < 50; x++)
-      {
-        display.drawPixel(x, y, SH110X_BLACK);
-      }
-    }
+    
+    // Czyszczenie obszaru od (0, 56) do (49, 63)
+    display.fillRect(0, 56, 50, 8, SH110X_BLACK);
+
     if (currentOption == PLAY_FILES)
     {
       // Formatuj czas jako "mm:ss"
