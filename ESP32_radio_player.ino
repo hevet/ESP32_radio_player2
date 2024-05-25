@@ -441,116 +441,108 @@ void sanitizeAndSaveStation(const char* station)
 
 void audio_info(const char *info)
 {
-  // Wyświetl informacje w konsoli szeregowej
-  Serial.print("info        ");
-  Serial.println(info);
-  // Znajdź pozycję "BitRate:" w tekście
-  int bitrateIndex = String(info).indexOf("BitRate:");
-  if (bitrateIndex != -1)
-  {
-    // Przytnij tekst od pozycji "BitRate:" do końca linii
-    bitrateString = String(info).substring(bitrateIndex + 8, String(info).indexOf('\n', bitrateIndex));
-  }
+    // Wyświetl informacje w konsoli szeregowej
+    Serial.print("info        ");
+    Serial.println(info);
 
-  // Znajdź pozycję "SampleRate:" w tekście
-  int sampleRateIndex = String(info).indexOf("SampleRate:");
-  if (sampleRateIndex != -1)
-  {
-    // Przytnij tekst od pozycji "SampleRate:" do końca linii
-    sampleRateString = String(info).substring(sampleRateIndex + 11, String(info).indexOf('\n', sampleRateIndex));
-  }
+    String infoStr = String(info);  // Convert to String once, reuse it
 
-  // Znajdź pozycję "BitsPerSample:" w tekście
-  int bitsPerSampleIndex = String(info).indexOf("BitsPerSample:");
-  if (bitsPerSampleIndex != -1)
-  {
-    // Przytnij tekst od pozycji "BitsPerSample:" do końca linii
-    bitsPerSampleString = String(info).substring(bitsPerSampleIndex + 15, String(info).indexOf('\n', bitsPerSampleIndex));
-  }
-
-  // Znajdź pozycję "skip metadata" w tekście
-  int metadata = String(info).indexOf("skip metadata");
-  if (metadata != -1)
-  {
-    noID3data = true;
-    Serial.println("Brak ID3 - nazwa pliku: " + fileNameString);
-    if (fileNameString.length() > 63)
+    // Extract "BitRate:"
+    int bitrateIndex = infoStr.indexOf("BitRate:");
+    if (bitrateIndex != -1)
     {
-      fileNameString = String(fileNameString).substring(0, 63);
+        bitrateString = infoStr.substring(bitrateIndex + 8, infoStr.indexOf('\n', bitrateIndex));
+        bitrateString = String(bitrateString.toFloat() / 1000.0, 0) + "kb/s"; // Convert to kb/s
     }
-  }
 
-  if (String(info).indexOf("MP3Decoder") != -1)
-  {
-    mp3 = true;
-    flac = false;
-    aac = false;
-  }
+    // Extract "SampleRate:"
+    int sampleRateIndex = infoStr.indexOf("SampleRate:");
+    if (sampleRateIndex != -1)
+    {
+        sampleRateString = infoStr.substring(sampleRateIndex + 11, infoStr.indexOf('\n', sampleRateIndex));
+        sampleRateString = String(sampleRateString.toFloat() / 1000.0, 1) + "kHz"; // Convert to kHz
+    }
 
-  if (String(info).indexOf("FLACDecoder") != -1)
-  {
-    flac = true;
-    mp3 = false;
-    aac = false;
-  }
+    // Extract "BitsPerSample:"
+    int bitsPerSampleIndex = infoStr.indexOf("BitsPerSample:");
+    if (bitsPerSampleIndex != -1)
+    {
+        bitsPerSampleString = infoStr.substring(bitsPerSampleIndex + 15, infoStr.indexOf('\n', bitsPerSampleIndex));
+    }
 
-  if (String(info).indexOf("AACDecoder") != -1)
-  {
-    aac = true;
-    flac = false;
-    mp3 = false;
-  }
+    // Znajdź pozycję "skip metadata" w tekście
+    if (infoStr.indexOf("skip metadata") != -1)
+    {
+        noID3data = true;
+        Serial.println("Brak ID3 - nazwa pliku: " + fileNameString);
+        if (fileNameString.length() > 63)
+        {
+            fileNameString = fileNameString.substring(0, 63);
+        }
+    }
 
-  if (currentOption == INTERNET_RADIO)
-  {
+    // Określ typ dekodera audio
+    if (infoStr.indexOf("MP3Decoder") != -1)
+    {
+        mp3 = true;
+        flac = false;
+        aac = false;
+    }
+    else if (infoStr.indexOf("FLACDecoder") != -1)
+    {
+        flac = true;
+        mp3 = false;
+        aac = false;
+    }
+    else if (infoStr.indexOf("AACDecoder") != -1)
+    {
+        aac = true;
+        flac = false;
+        mp3 = false;
+    }
+
+    // Wyświetlanie informacji na ekranie w oparciu o bieżącą opcję
     display.setTextSize(1);
     display.setTextColor(SH110X_WHITE);
 
-    // Czyszczenie obszaru ekranu prostokątem
-    display.fillRect(0, 37, 128, 18, SH110X_BLACK);
+    if (currentOption == INTERNET_RADIO)
+    {
+        display.fillRect(0, 37, 128, 18, SH110X_BLACK);
+        display.setCursor(0, 37);
+        display.println(sampleRateString + " " + bitsPerSampleString + "bit");
 
-    display.setCursor(0, 37);
-    display.println(sampleRateString.substring(1) + "Hz " + bitsPerSampleString + "bit");
-    
-    display.setCursor(0, 47);
-    display.println(bitrateString.substring(1) + "b/s  Bank " + String(bank_nr));
+        display.setCursor(0, 47);
+        display.println(bitrateString + "  Bank " + String(bank_nr));
 
-    // Czyszczenie obszaru ekranu prostokątem
-    display.fillRect(51, 56, 76, 8, SH110X_BLACK);
+        display.fillRect(51, 56, 76, 8, SH110X_BLACK);
+        display.setCursor(66, 56);
+        display.println("Stacja " + String(station_nr));
+    }
+    else if (currentOption == PLAY_FILES)
+    {
+        if (noID3data)
+        {
+            display.fillRect(0, 9, 128, 28, SH110X_BLACK);
+            display.setCursor(0, 10);
+            display.println(fileNameString);
+        }
 
-    display.setCursor(66, 56);
-    display.println("Stacja " + String(station_nr));
+        display.fillRect(0, 37, 128, 18, SH110X_BLACK);
+        display.setCursor(0, 37);
+        display.println(sampleRateString + " " + bitsPerSampleString + "bit");
+
+        display.setCursor(0, 47);
+        display.println(bitrateString + " Plik " + String(fileIndex) + "/" + String(totalFilesInFolder));
+
+        display.fillRect(51, 56, 76, 8, SH110X_BLACK);
+        display.setCursor(66, 56);
+        display.println("Folder " + String(folderIndex));
+    }
+
     display.display();
-  }
-
-  if (currentOption == PLAY_FILES) {
-  display.setTextSize(1);
-  display.setTextColor(SH110X_WHITE);
-
-  if (noID3data) {
-    // Czyszczenie obszaru (0, 9) do (127, 36)
-    display.fillRect(0, 9, 128, 28, SH110X_BLACK);
-    display.setCursor(0, 10);
-    display.println(fileNameString);
-  }
-
-  // Czyszczenie obszaru (0, 37) do (127, 54)
-  display.fillRect(0, 37, 128, 18, SH110X_BLACK);
-  display.setCursor(0, 37);
-  display.println(sampleRateString.substring(1) + "Hz " + bitsPerSampleString + "bit");
-
-  display.setCursor(0, 47);
-  display.println(bitrateString.substring(1) + "b/s Plik " + String(fileIndex) + "/" + String(totalFilesInFolder));
-
-  // Czyszczenie obszaru (51, 56) do (127, 63)
-  display.fillRect(51, 56, 76, 8, SH110X_BLACK);
-  display.setCursor(66, 56);
-  display.println("Folder " + String(folderIndex));
-
-  display.display();
-  seconds = 0;
- }
+    seconds = 0;
 }
+
 
 void processText(String &text)
 {
@@ -1153,9 +1145,9 @@ void playFromSelectedFolder()
         }
 
         display.setCursor(0, 37);
-        display.println(sampleRateString.substring(1) + "Hz " + bitsPerSampleString + "bit");
+        display.println(sampleRateString + "kHz " + bitsPerSampleString + "bit");
         display.setCursor(0, 47);
-        display.println(bitrateString.substring(1) + "b/s Plik " + String(fileIndex) + "/" + String(totalFilesInFolder));
+        display.println(bitrateString + "kb/s Plik " + String(fileIndex) + "/" + String(totalFilesInFolder));
         display.setCursor(66, 56);
         display.println("Folder " + String(folderIndex));
         display.display();
@@ -1715,7 +1707,7 @@ void loop()
     display.setCursor(0, 10);
     display.println(stationString);
     display.setCursor(0, 37);
-    display.println(sampleRateString.substring(1) + "Hz " + bitsPerSampleString + "bit");
+    display.println(sampleRateString + "kHz " + bitsPerSampleString + "bit");
 
     display.setCursor(102, 37);
     if (mp3 == true)
@@ -1732,7 +1724,7 @@ void loop()
     }
     
     display.setCursor(0, 47);
-    display.println(bitrateString.substring(1) + "b/s  Bank " + String(bankFromBuffer));
+    display.println(bitrateString + "kb/s  Bank " + String(bankFromBuffer));
     display.setCursor(66, 56);
     display.println("Stacja " + String(stationFromBuffer));
     display.display();
